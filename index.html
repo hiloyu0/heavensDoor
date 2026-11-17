@@ -606,7 +606,7 @@ function createBook(face, idx) {
   gx.setTransform(1, 0, 0, 2, 0, 0); gx.fillStyle = gg; gx.fillRect(0, 0, 128, 128);
   const glow = new THREE.Mesh(new THREE.PlaneGeometry(W * 0.8, H * 0.9), new THREE.MeshBasicMaterial({ map: tex(gc), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, opacity: 0 }));
   glow.position.set(openMode === 'double' ? f.spineX : f.minX + W * 0.15, -(f.minY + f.maxY) / 2, 0.5); glow.renderOrder = 2.5; group.add(glow);
-  const book = { face, f, group, pages, base, baseC, raw, faceSrc: coverSrc, holesC, Bfull, ts, mode: openMode, spP, seed, glow, lines: pick(9), state: 'opening', t0: now(), inkT: 0, inkShown: -1, idx, inkPage: null, inkPen: null };
+  const book = { face, f, group, pages, base, baseC, raw, faceSrc: coverSrc, faceOrig: faceC, holesC, Bfull, ts, mode: openMode, spP, seed, glow, lines: pick(9), state: 'opening', t0: now(), inkT: 0, inkShown: -1, idx, inkPage: null, inkPen: null };
   renderBase(book, 0);
   if (HM) createHairLayer(book, HM);
   scene.add(group); placeBook(book);
@@ -647,7 +647,7 @@ function renderBase(b, reveal) {
   // skin turns to printed paper but keeps the face's own shading
   x.globalCompositeOperation = 'multiply'; x.drawImage(pc, 0, 0);
   x.globalCompositeOperation = 'source-over';
-  const keep = mk(w, h), kx = keep.getContext('2d'); kx.drawImage(b.faceSrc, 0, 0);
+  const keep = mk(w, h), kx = keep.getContext('2d'); kx.drawImage(b.faceOrig, 0, 0);
   const km = mk(w, h), kmx = km.getContext('2d'); kmx.filter = `blur(${ts * 2}px)`; kmx.fillStyle = '#000'; drawHoles(kmx, holeShapes(f), f, ts, 0, 1.2); kmx.fill();
   maskWith(keep, km); x.drawImage(keep, 0, 0);
   // a soft shadow just inside each hole: they sit deeper than the page
@@ -757,14 +757,19 @@ function hairMaskFor(f) {
     if (band.length < 40) return null;
     const med = k => band.map(b => b[k]).sort((a, b) => a - b)[band.length >> 1];
     const hairC = [med(0), med(1), med(2)];
-    const spX = (f.spineX - x0) * ts2, half = W * ts2 / 2, noseY = (f.noseY - y0) * ts2, chinY = (f.maxY - y0) * ts2;
+    const spX = (f.spineX - x0) * ts2, half = W * ts2 / 2, noseY = (f.noseY - y0) * ts2, chinY = (f.maxY - y0) * ts2, eyeY = ((f.feats[0].y + f.feats[1].y) / 2 - y0) * ts2;
     const feats = f.feats.map(e => { const [x, y] = P(e.x, e.y); return { x, y, rx: e.rx * ts2, ry: e.ry * ts2 }; });
     const pr = new Float32Array(w * h);
     for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
       const i = (y * w + x) * 4, r = d[i], g = d[i + 1], b = d[i + 2];
       let v = smooth(0.12, 0.22, dist(r, g, b, skin)) * (1 - smooth(0.17, 0.3, dist(r, g, b, hairC)));
       if (v < 0.05) continue;
-      if (inFace[i + 3] > 128) { if (y > noseY) v *= smooth(0.5, 0.8, Math.abs(x - spX) / half); for (const e of feats) { const q = ((x - e.x) / e.rx) ** 2 + ((y - e.y) / e.ry) ** 2; if (q < 1.7) v *= smooth(1.0, 1.7, q); } }
+      if (inFace[i + 3] > 128) {
+        // inside the face only clear hair counts: closer to the hair colour, and below the eyes only at the outer edges
+        v *= 1 - smooth(0.1, 0.2, dist(r, g, b, hairC));
+        if (y > eyeY) v *= smooth(0.62, 0.85, Math.abs(x - spX) / half);
+        for (const e of feats) { const q = ((x - e.x) / e.rx) ** 2 + ((y - e.y) / e.ry) ** 2; if (q < 2.6) v *= smooth(1.2, 2.6, q); }
+      }
       else if (y > chinY - 0.02 * H * ts2 && Math.abs(x - spX) < half * 1.5) v = 0;   // neck and chest
       pr[y * w + x] = v;
     }
