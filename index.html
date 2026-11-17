@@ -162,7 +162,7 @@ vec3 gradeCol(vec3 c, float amt, float tone, vec2 wp){
   float l = dot(c, vec3(0.299, 0.587, 0.114));
   // keep strongly coloured details (eyes, lips) in colour
   float mxc = max(c.r, max(c.g, c.b)), mnc = min(c.r, min(c.g, c.b));
-  amt *= 1.0 - 0.45 * smoothstep(0.3, 0.65, (mxc - mnc) / (mxc + 0.001)) * smoothstep(0.08, 0.25, mxc);
+  amt *= 1.0 - 0.25 * smoothstep(0.3, 0.65, (mxc - mnc) / (mxc + 0.001)) * smoothstep(0.08, 0.25, mxc);
   vec3 sep = vec3(l * 1.08 + 0.02, l * 0.96 + 0.005, l * 0.80);
   vec3 g = mix(c, mix(vec3(l), sep, 0.6), 0.85 * amt);
   g = (g - 0.5) * (1.0 + 0.32 * amt) + 0.5;
@@ -630,7 +630,7 @@ function createBook(face, idx) {
   const base = new THREE.Mesh(new THREE.PlaneGeometry(W, H), baseMat);
   base.position.set((f.minX + f.maxX) / 2, -(f.minY + f.maxY) / 2, 0.1); base.renderOrder = 1; base.visible = true;
   group.add(base);
-  const gc = mk(128, 256), gx = gc.getContext('2d'), gg = gx.createRadialGradient(64, 128, 0, 64, 128, 64);
+  const gc = mk(128, 256), gx = gc.getContext('2d'), gg = gx.createRadialGradient(64, 64, 0, 64, 64, 64);
   gg.addColorStop(0, 'rgba(255,214,140,0.6)'); gg.addColorStop(1, 'rgba(255,150,60,0)');
   gx.setTransform(1, 0, 0, 2, 0, 0); gx.fillStyle = gg; gx.fillRect(0, 0, 128, 128);
   const glow = new THREE.Mesh(new THREE.PlaneGeometry(W * 0.8, H * 0.9), new THREE.MeshBasicMaterial({ map: tex(gc), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, opacity: 0 }));
@@ -990,7 +990,7 @@ function scrap(x, y, vx, vy, delay, big) {
 }
 function burst(b) {
   const f = b.f, r = Math.random;
-  for (let i = 0; i < 12; i++) {
+  for (let i = 0; i < 7; i++) {
     const ly = f.minY + r() * (f.maxY - f.minY);
     const [x, y] = toDisp(f, b.mode === 'double' ? f.spineX : (b.singleSide < 0 ? f.maxX - (f.maxX - f.minX) * 0.06 : f.minX + (f.maxX - f.minX) * 0.06), ly);
     const a = (r() < .5 ? Math.PI : 0) + (r() - .5) * 1.2 + f.ang, sp = 200 + r() * 600;
@@ -1067,9 +1067,9 @@ function drawFx(t, dt) {
           const r = rng(((t * 12) | 0) + b.idx * 99);
           fxx.save();
           for (let i = 0; i < (impact ? 120 : 38); i++) {
-            const an = r() * Math.PI * 2, wd = (impact ? 0.006 : 0.003) + r() * (impact ? 0.02 : 0.012), r0 = fr * ((impact ? 1.35 : 1.65) + r() * 0.9 + (e - IMPACT_AT) * 0.5);
+            const an = r() * Math.PI * 2, wd = (impact ? 0.006 : 0.003) + r() * (impact ? 0.02 : 0.012), r0 = fr * ((impact ? 1.35 : 1.9) + r() * 0.9 + (e - IMPACT_AT) * 0.5);
             const below = Math.sin(an) > 0.35 ? 0.35 : 1;
-            fxx.fillStyle = impact ? '#140b18' : `rgba(15,8,20,${0.42 * a * below})`;
+            fxx.fillStyle = impact ? '#140b18' : `rgba(15,8,20,${0.32 * a * below})`;
             fxx.beginPath(); fxx.moveTo(cx + Math.cos(an - wd) * R, cy + Math.sin(an - wd) * R); fxx.lineTo(cx + Math.cos(an) * r0, cy + Math.sin(an) * r0); fxx.lineTo(cx + Math.cos(an + wd) * R, cy + Math.sin(an + wd) * R); fxx.fill();
           }
           fxx.restore();
