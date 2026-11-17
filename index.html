@@ -104,6 +104,7 @@ kbd { font-family: var(--f-body); font-size: 11px; border: 1px solid currentColo
       <button id="btnSound" type="button" aria-pressed="true">音 オン</button>
       <button id="btnHair" type="button" aria-pressed="true">髪をなびかせる オン</button>
       <button id="btnMode" type="button">開き方：片開き</button>
+      <button id="btnOutline" type="button" aria-pressed="false">輪郭線 オフ</button>
     </div>
     <form class="write" id="writeForm">
       <input id="ink" maxlength="40" placeholder="ページに書き込む（例：今日は早く寝る）" autocomplete="off">
@@ -331,11 +332,12 @@ function frameFromLandmarks(pts) {
   const browY = Math.min(...L.slice(17, 27).map(p => p.y));
   const chinY = L[8].y;
   const dl = L[30].x - L[0].x, dr = L[16].x - L[30].x, yaw = (dr - dl) / Math.max(1, dr + dl);
-  const topY = browY - (0.55 - 0.25 * Math.min(1, Math.abs(yaw) * 1.6)) * (chinY - browY);
+  const topY = browY - (0.42 - 0.2 * Math.min(1, Math.abs(yaw) * 1.6)) * (chinY - browY);
   const j0 = jaw[0], j16 = jaw[16];
   const cx = (j0.x + j16.x) / 2, cy = (j0.y + j16.y) / 2, rx = (j16.x - j0.x) / 2, ry = cy - topY;
   let poly = jaw.map(p => ({ x: p.x, y: p.y }));
-  for (let i = 1; i < 24; i++) { const t = i / 24 * Math.PI; poly.push({ x: cx + rx * Math.cos(t), y: cy - ry * Math.sin(t) }); }
+  // forehead: narrower toward the top (temples), so the sheet stays inside the hairline
+  for (let i = 1; i < 24; i++) { const t = i / 24 * Math.PI, st = Math.sin(t); poly.push({ x: cx + rx * Math.cos(t) * (1 - 0.12 * st), y: cy - ry * st }); }
   const mx = cx, my = (topY + chinY) / 2;
   poly = poly.map(p => ({ x: mx + (p.x - mx) * 1.11, y: my + (p.y - my) * 1.05 }));
   const spineX = avg([L[28], L[29], L[30], L[33], L[51], L[57]]).x;
@@ -347,6 +349,7 @@ function frameFromLandmarks(pts) {
   const mid = (a, b) => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
   fr.skin = [L[29], mid(L[2], L[31]), mid(L[14], L[35]), mid(L[30], L[51])];
   fr.noseY = L[33].y;
+  fr.lm = L;
   return fr;
 }
 function ovalPoly(cx, cy, rx, ryTop, ryBot) {
@@ -953,6 +956,20 @@ function emitFromTip(b, p) {
   for (let i = 0; i < 3; i++) { const a = (p.side > 0 ? 0 : Math.PI) + (r() - .5) * 1.4 + b.f.ang, sp = 120 + r() * 300; scrap(x, y + (r() - .5) * 60, Math.cos(a) * sp, Math.sin(a) * sp - 100, 0.05, false); }
 }
 const IMPACT_AT = 0.26, IMPACT_LEN = 0.075;
+// check view: the outline the face sheet is cut to (yellow) and the detected landmarks (cyan)
+function drawOutlines() {
+  const list = books.length ? books.map(b => b.f) : faces.map(fc => fc.frame);
+  fxx.save(); fxx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  for (const f of list) {
+    fxx.lineWidth = 2; fxx.strokeStyle = '#ffd400'; fxx.shadowColor = '#000'; fxx.shadowBlur = 3;
+    fxx.beginPath(); f.poly.forEach((q, i) => { const [x, y] = toDisp(f, q.x, q.y); i ? fxx.lineTo(x, y) : fxx.moveTo(x, y); }); fxx.closePath(); fxx.stroke();
+    const [ax, ay] = toDisp(f, f.spineX, f.minY), [bx, by] = toDisp(f, f.spineX, f.maxY);
+    fxx.setLineDash([4, 4]); fxx.lineWidth = 1; fxx.beginPath(); fxx.moveTo(ax, ay); fxx.lineTo(bx, by); fxx.stroke(); fxx.setLineDash([]);
+    fxx.fillStyle = '#00e5ff'; fxx.shadowBlur = 0;
+    for (const q of (f.lm || [])) { const [x, y] = toDisp(f, q.x, q.y); fxx.beginPath(); fxx.arc(x, y, 2, 0, 7); fxx.fill(); }
+  }
+  fxx.restore();
+}
 function drawFx(t, dt) {
   fxx.setTransform(dpr, 0, 0, dpr, 0, 0); fxx.clearRect(0, 0, dispW, dispH);
   U.uImpact.value = 0;
@@ -1236,6 +1253,8 @@ $('#writeForm').addEventListener('submit', e => {
   msg('');
 });
 
+let showOutline = false;
+$('#btnOutline').addEventListener('click', e => { showOutline = !showOutline; e.currentTarget.setAttribute('aria-pressed', showOutline); e.currentTarget.textContent = showOutline ? '輪郭線 オン' : '輪郭線 オフ'; });
 $('#btnMode').addEventListener('click', e => { openMode = openMode === 'single' ? 'double' : 'single'; e.currentTarget.textContent = openMode === 'single' ? '開き方：片開き' : '開き方：両開き'; if (isOpen()) { closeAll(); setTimeout(() => { if (!isOpen()) openAll(); }, 900); } });
 $('#btnHair').addEventListener('click', e => { hairOn = !hairOn; e.currentTarget.setAttribute('aria-pressed', hairOn); e.currentTarget.textContent = hairOn ? '髪をなびかせる オン' : '髪をなびかせる オフ'; if (isOpen()) { closeAll(); setTimeout(() => { if (!isOpen()) openAll(); }, 900); } });
 $('#ink').addEventListener('focus', () => { inkFocus = true; });
@@ -1382,6 +1401,7 @@ function frame() {
   $('#vig').style.opacity = (0.9 * grade).toFixed(3);
   stage.classList.toggle('open', isOpen());
   drawFx(t, dt);
+  if (showOutline) drawOutlines();
   drawSfx(t);
   drawInkUi(t);
   renderer.render(scene, camera);
@@ -1399,7 +1419,7 @@ if (document.fonts) {
 }
 requestAnimationFrame(frame);
 loadModels();
-window.__kao = { toggle, get faces() { return faces; }, get books() { return books; }, useImage, dragOpen };
+window.__kao = { setOutline: v => { showOutline = !!v; }, toggle, get faces() { return faces; }, get books() { return books; }, useImage, dragOpen };
 })();
 </script>
 
