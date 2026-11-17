@@ -217,22 +217,6 @@ const FS_BG = `
 uniform sampler2D map; varying vec2 vUv; varying vec3 vN; varying vec3 vW;
 ${GRADE}
 void main(){ vec3 c = texture2D(map, vUv).rgb; gl_FragColor = vec4(gradeCol(c, uGrade, uGrade * 0.28, vW.xy), 1.0); }`;
-const VS_HAIR = `
-attribute vec2 photo; varying vec2 vP; varying vec2 vUv; varying vec3 vN; varying vec3 vW;
-void main(){ vUv = uv; vP = photo; vN = normalize(mat3(modelMatrix) * normal);
-  vec4 w = modelMatrix * vec4(position, 1.0); vW = w.xyz; gl_Position = projectionMatrix * viewMatrix * w; }`;
-const FS_HAIR = `
-uniform sampler2D map; uniform float lift;
-varying vec2 vP; varying vec2 vUv; varying vec3 vN; varying vec3 vW;
-${GRADE}
-void main(){
-  // soft-edged strand of the photo's own hair
-  float a = smoothstep(0.0, 0.3, vUv.y) * smoothstep(1.0, 0.7, vUv.y) * (1.0 - smoothstep(0.45, 1.0, vUv.x));
-  if (a < 0.01) discard;
-  vec3 col = texture2D(map, vP).rgb;
-  col *= 1.0 + 0.12 * lift * vUv.x;
-  gl_FragColor = vec4(gradeCol(col, uGrade, uGrade * 0.28, vW.xy), a);
-}`;
 const FS_FRINGE = `
 uniform sampler2D front; varying vec2 vUv; varying vec3 vN; varying vec3 vW;
 ${GRADE}
@@ -374,6 +358,7 @@ function ovalPoly(cx, cy, rx, ryTop, ryBot) {
 }
 
 /* ---------- demo portrait (original illustration) ---------- */
+let demoHairC = null;
 const DEMO = { w: 800, h: 960, cx: 400, cy: 470, rx: 148, ryTop: 186, ryBot: 196 };
 function drawDemo() {
   const { w, h, cx, cy, rx, ryTop, ryBot } = DEMO;
@@ -422,6 +407,21 @@ function drawDemo() {
   f.feats = [{ x: -66, y: 15, rx: 52, ry: 40 }, { x: 66, y: 15, rx: 52, ry: 40 }, { x: -70, y: -52, rx: 50, ry: 22 }, { x: 70, y: -52, rx: 50, ry: 22 }, { x: 0, y: 122, rx: 42, ry: 24 }, { x: 0, y: 75, rx: 16, ry: 22 }];
   f.skin = [{ x: 0, y: 45 }, { x: -85, y: 75 }, { x: 85, y: 75 }, { x: 0, y: 150 }];
   f.noseY = 82;
+  // exact hair mask for the illustration: back hair minus face, ears, neck and body, plus the fringe
+  demoHairC = mk(w, h); const hc = demoHairC.getContext('2d'); hc.fillStyle = '#000';
+  hc.beginPath(); hc.ellipse(cx, cy - 40, rx * 1.38, ryTop * 1.3, 0, Math.PI, 0); hc.lineTo(cx + rx * 1.42, cy + 230); hc.quadraticCurveTo(cx, cy + 300, cx - rx * 1.42, cy + 230); hc.closePath(); hc.fill();
+  hc.globalCompositeOperation = 'destination-out';
+  hc.beginPath(); poly.forEach((p, i) => i ? hc.lineTo(p.x, p.y) : hc.moveTo(p.x, p.y)); hc.closePath(); hc.fill();
+  hc.beginPath(); hc.ellipse(cx - rx + 4, cy + 10, 20, 34, -.2, 0, 7); hc.fill(); hc.beginPath(); hc.ellipse(cx + rx - 4, cy + 10, 20, 34, .2, 0, 7); hc.fill();
+  hc.beginPath(); hc.moveTo(352, 600); hc.lineTo(448, 600); hc.lineTo(460, 735); hc.quadraticCurveTo(400, 770, 340, 735); hc.fill();
+  hc.beginPath(); hc.moveTo(80, h); hc.quadraticCurveTo(110, 760, 300, 720); hc.lineTo(500, 720); hc.quadraticCurveTo(690, 760, 720, h); hc.fill();
+  hc.globalCompositeOperation = 'source-over';
+  hc.beginPath(); hc.moveTo(cx - rx * 1.25, cy + 60); hc.quadraticCurveTo(cx - rx * 1.3, cy - ryTop * 1.25, cx, cy - ryTop * 1.2);
+  hc.quadraticCurveTo(cx + rx * 1.35, cy - ryTop * 1.2, cx + rx * 1.24, cy + 70);
+  prev = [cx + rx * 1.24, cy + 70];
+  tips.forEach(([tx, ty], i) => { const x = cx + rx * tx, y = cy + ryTop * ty; const mx = (prev[0] + x) / 2, my = cy - ryTop * (0.72 + (i % 2) * 0.12); hc.quadraticCurveTo(mx, my, x, y); prev = [x, y]; });
+  hc.closePath(); hc.fill();
+  f.demoHair = true;
   return [{ frame: f, score: 1, expr: 'happy', demo: true }];
 }
 
@@ -511,8 +511,9 @@ function createBook(face, idx) {
   fc.scale(ts, ts); fc.translate(-f.minX, -f.minY); fc.rotate(-f.ang); fc.translate(-f.ox, -f.oy); fc.drawImage(src, 0, 0);
   const raw = mk(Wp, Hp), rx = raw.getContext('2d'); rx.fillStyle = '#000'; polyPath(rx, f.poly, f, ts); rx.fill();
   const maskC = mk(Wp, Hp), mx = maskC.getContext('2d'); mx.filter = `blur(${Math.max(1, ts * 1.2)}px)`; mx.drawImage(raw, 0, 0);
-  let coverSrc = faceC, fringeC = null;
-  if (hairOn && f.skin) { const hs = separateHair(f, faceC, raw, ts); if (hs) { coverSrc = hs.cover; fringeC = hs.hair; } }
+  let coverSrc = faceC;
+  const HM = hairOn && f.skin ? hairMaskFor(f) : null;
+  if (HM) coverSrc = inpaintCover(faceC, HM, f, ts, raw);
   const halves = [{ side: -1, sx: 0, sw: spP }, { side: 1, sx: spP, sw: Wp - spP }];
 
   const fsz = Hp * 0.048;
@@ -586,8 +587,7 @@ function createBook(face, idx) {
   glow.position.set(f.spineX, -(f.minY + f.maxY) / 2, 0.5); glow.renderOrder = 2.5; group.add(glow);
   const book = { face, f, group, pages, base, baseC, raw, Bfull: boundsOf(raw), ts, spP, seed, glow, lines: pick(9), state: 'opening', t0: now(), inkT: 0, inkShown: -1, idx, inkPage: inkInfo, inkPen: null };
   renderBase(book, 0); renderInkPage(book, 0);
-  if (hairOn) createHair(book);
-  if (fringeC) createFringe(book, fringeC);
+  if (HM) createHairLayer(book, HM);
   scene.add(group); placeBook(book);
   return book;
 }
@@ -698,162 +698,123 @@ function updateBook(b, t, dt) {
     b.inkT += dt; const n = Math.min(total, Math.floor(b.inkT * 14));
     if (n !== b.inkShown) { b.inkShown = n; renderInkPage(b, n); }
   }
-  if (b.hair) updateHair(b, t, dt, el, opening);
-  if (b.fringe) updateFringe(b, t, dt, el, opening);
+  if (b.hairL) updateHairLayer(b, t, dt, el, opening);
 }
 
-/* ---------- hair that floats and sways as hair (option) ---------- */
+/* ---------- hair: found from the scalp down, moved from its roots ---------- */
 let hairOn = true;
-const HAIR_N = 22, HC = 14, HR = 3;
-function createHair(b) {
-  const f = b.f, r = Math.random;
-  const cx = f.spineX, cy = (f.minY + f.maxY) / 2 + (f.maxY - f.minY) * 0.04;
-  const rx = (f.maxX - f.minX) / 2, ryT = cy - f.minY, ryB = f.maxY - cy;
-  const rIn = a => { const ry = Math.sin(a) > 0 ? ryB : ryT; return 0.95 / Math.sqrt(Math.cos(a) ** 2 / rx ** 2 + Math.sin(a) ** 2 / ry ** 2); };
-  const a0 = -Math.PI - 0.55, a1 = 0.55, da = (a1 - a0) / HAIR_N, cs = Math.cos(f.ang), sn = Math.sin(f.ang);
-  const strands = [];
-  for (let i = 0; i < HAIR_N; i++) {
-    const s0 = a0 + (i - 0.35) * da, s1 = a0 + (i + 1.35) * da, ext = 0.75 + r() * 0.4;
-    const n = (HC + 1) * (HR + 1), uv = new Float32Array(n * 2), ph = new Float32Array(n * 2), idx = [];
-    for (let j = 0; j <= HR; j++) for (let k = 0; k <= HC; k++) {
-      const id = j * (HC + 1) + k, u = k / HC, v = j / HR, ang = s0 + (s1 - s0) * v, rr = rIn(ang) * (1 + u * ext);
-      const lx = cx + Math.cos(ang) * rr, ly = cy + Math.sin(ang) * rr, X = f.ox + cs * lx - sn * ly, Y = f.oy + sn * lx + cs * ly;
-      uv[id * 2] = u; uv[id * 2 + 1] = v; ph[id * 2] = X / src.width; ph[id * 2 + 1] = 1 - Y / src.height;
+// hair region in the face's upright frame, sampled at ts2 px per local unit
+function hairMaskFor(f) {
+  const W = f.maxX - f.minX, H = f.maxY - f.minY;
+  const x0 = f.minX - 0.85 * W, x1 = f.maxX + 0.85 * W, y0 = f.minY - 0.65 * H, y1 = f.maxY + 0.75 * H;
+  const ts2 = Math.min(1.6, 560 / Math.max(x1 - x0, y1 - y0)), w = Math.round((x1 - x0) * ts2), h = Math.round((y1 - y0) * ts2);
+  const toFrame = (c, source) => { const x = c.getContext('2d', { willReadFrequently: true }); x.setTransform(ts2, 0, 0, ts2, 0, 0); x.translate(-x0, -y0); x.rotate(-f.ang); x.translate(-f.ox, -f.oy); x.drawImage(source, 0, 0); x.setTransform(1, 0, 0, 1, 0, 0); return x; };
+  const img = mk(w, h); const ix = toFrame(img, src);
+  const mask = mk(w, h);
+  const P = (lx, ly) => [(lx - x0) * ts2, (ly - y0) * ts2];
+  if (f.demoHair && demoHairC) { toFrame(mask, demoHairC); }
+  else {
+    const d = ix.getImageData(0, 0, w, h).data;
+    const fm = mk(w, h), fmx = fm.getContext('2d', { willReadFrequently: true }); fmx.fillStyle = '#000'; fmx.beginPath(); f.poly.forEach((q, i) => { const [x, y] = P(q.x, q.y); i ? fmx.lineTo(x, y) : fmx.moveTo(x, y); }); fmx.closePath(); fmx.fill();
+    const inFace = fmx.getImageData(0, 0, w, h).data;
+    const avgAt = pts => { let r = 0, g = 0, b = 0, n = 0; for (const [x, y] of pts) { const X = clamp(Math.round(x), 0, w - 1), Y = clamp(Math.round(y), 0, h - 1), i = (Y * w + X) * 4; r += d[i]; g += d[i + 1]; b += d[i + 2]; n++; } return [r / n, g / n, b / n]; };
+    const skinPts = []; for (const q of f.skin) { const [x, y] = P(q.x, q.y); for (let dy = -3; dy <= 3; dy++) for (let dx = -3; dx <= 3; dx++) skinPts.push([x + dx * ts2 * 2, y + dy * ts2 * 2]); }
+    const skin = avgAt(skinPts);
+    const dist = (r, g, b, c) => Math.max(Math.sqrt(0.35 * (r - c[0]) ** 2 + 0.45 * (g - c[1]) ** 2 + 0.2 * (b - c[2]) ** 2) / 255, Math.abs((0.299 * r + 0.587 * g + 0.114 * b) - (0.299 * c[0] + 0.587 * c[1] + 0.114 * c[2])) / 255 * 1.1);
+    // hair colour from the band just above the hairline (median of non-skin pixels)
+    const band = []; for (let ly = f.minY - 0.22 * H; ly < f.minY + 0.02 * H; ly += 2 / ts2) for (let lx = f.spineX - 0.3 * W; lx < f.spineX + 0.3 * W; lx += 2 / ts2) { const [x, y] = P(lx, ly), X = Math.round(x), Y = Math.round(y); if (X < 0 || Y < 0 || X >= w || Y >= h) continue; const i = (Y * w + X) * 4; if (dist(d[i], d[i + 1], d[i + 2], skin) > 0.15) band.push([d[i], d[i + 1], d[i + 2], X, Y]); }
+    if (band.length < 40) return null;
+    const med = k => band.map(b => b[k]).sort((a, b) => a - b)[band.length >> 1];
+    const hairC = [med(0), med(1), med(2)];
+    const spX = (f.spineX - x0) * ts2, half = W * ts2 / 2, noseY = (f.noseY - y0) * ts2, chinY = (f.maxY - y0) * ts2;
+    const feats = f.feats.map(e => { const [x, y] = P(e.x, e.y); return { x, y, rx: e.rx * ts2, ry: e.ry * ts2 }; });
+    const pr = new Float32Array(w * h);
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      const i = (y * w + x) * 4, r = d[i], g = d[i + 1], b = d[i + 2];
+      let v = smooth(0.12, 0.22, dist(r, g, b, skin)) * (1 - smooth(0.17, 0.3, dist(r, g, b, hairC)));
+      if (v < 0.05) continue;
+      if (inFace[i + 3] > 128) { if (y > noseY) v *= smooth(0.5, 0.8, Math.abs(x - spX) / half); for (const e of feats) { const q = ((x - e.x) / e.rx) ** 2 + ((y - e.y) / e.ry) ** 2; if (q < 1.7) v *= smooth(1.0, 1.7, q); } }
+      else if (y > chinY + 0.04 * H * ts2 && Math.abs(x - spX) < half * 1.1) v = 0;   // neck and chest
+      pr[y * w + x] = v;
     }
-    for (let j = 0; j < HR; j++) for (let k = 0; k < HC; k++) { const a = j * (HC + 1) + k, b2 = a + 1, c = a + HC + 1, d = c + 1; idx.push(a, c, b2, b2, c, d); }
-    const g = new THREE.BufferGeometry(); g.setIndex(idx);
-    g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(n * 3), 3));
-    const nor = new Float32Array(n * 3); for (let q = 2; q < nor.length; q += 3) nor[q] = 1;
-    g.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
-    g.setAttribute('uv', new THREE.BufferAttribute(uv, 2)); g.setAttribute('photo', new THREE.BufferAttribute(ph, 2));
-    const mat = new THREE.ShaderMaterial({ uniforms: { ...U, map: { value: srcTex }, lift: { value: 0 } }, vertexShader: VS_HAIR, fragmentShader: FS_HAIR, transparent: true, depthWrite: false, side: THREE.DoubleSide });
-    const mesh = new THREE.Mesh(g, mat); mesh.frustumCulled = false; mesh.renderOrder = 0.5;
-    b.group.add(mesh);
-    const mid = (s0 + s1) / 2;
-    strands.push({ mesh, geom: g, s0, s1, ext, side: Math.cos(mid) >= 0 ? 1 : -1, sway: 0, swayV: 0, puff: 0, puffV: 0,
-      delay: IMPACT_AT + 0.02 + Math.abs(Math.sin(mid)) * 0.08 + r() * 0.05, K: 30 + r() * 25, phase: r() * 6.28, freq: 1.4 + r() * 0.9, launched: false });
+    // keep only what is connected to the hair above the hairline
+    const keep = new Uint8Array(w * h), q = new Int32Array(w * h); let qh = 0, qt = 0;
+    for (const bd of band) { const j = bd[4] * w + bd[3]; if (pr[j] > 0.4 && !keep[j]) { keep[j] = 1; q[qt++] = j; } }
+    while (qh < qt) { const i = q[qh++], x = i % w; for (const j of [i - 1, i + 1, i - w, i + w]) { if (j < 0 || j >= w * h || keep[j] || Math.abs((j % w) - x) > 1) continue; if (pr[j] > 0.4) { keep[j] = 1; q[qt++] = j; } } }
+    if (qt < w * h * 0.02) return null;
+    const mx = mask.getContext('2d', { willReadFrequently: true }), out = mx.createImageData(w, h);
+    for (let i = 0; i < w * h; i++) if (keep[i]) out.data[i * 4 + 3] = 255 * pr[i];
+    mx.putImageData(out, 0, 0);
   }
-  b.hair = { strands, cx, cy, rIn };
-  for (const st of strands) bendHair(b, st, 0);
+  // soften, then firm up the edge
+  const sm = mk(w, h), sx = sm.getContext('2d', { willReadFrequently: true }); sx.filter = `blur(${Math.max(1.2, ts2 * 1.6)}px)`; sx.drawImage(mask, 0, 0); sx.filter = 'none';
+  const sd = sx.getImageData(0, 0, w, h); for (let i = 3; i < sd.data.length; i += 4) sd.data[i] = 255 * smooth(0.25, 0.6, sd.data[i] / 255); sx.putImageData(sd, 0, 0);
+  const hair = mk(w, h); hair.getContext('2d').drawImage(img, 0, 0); maskWith(hair, sm);
+  // what shows where the hair has moved away: a soft blur of the surroundings
+  const under = mk(w, h), ux = under.getContext('2d'); ux.filter = `blur(${Math.max(4, ts2 * 9)}px)`; ux.drawImage(img, 0, 0); ux.filter = 'none';
+  const grow = mk(w, h), gx = grow.getContext('2d'); gx.filter = `blur(${Math.max(3, ts2 * 6)}px)`; gx.drawImage(sm, 0, 0); gx.drawImage(sm, 0, 0); gx.filter = 'none';
+  maskWith(under, grow);
+  return { x0, y0, ts2, w, h, mask: sm, hair, under, W, H };
 }
-function bendHair(b, st, t) {
-  const { cx, cy, rIn } = b.hair, pos = st.geom.attributes.position.array;
-  for (let j = 0; j <= HR; j++) {
-    const v = j / HR, ang0 = st.s0 + (st.s1 - st.s0) * v, rin = rIn(ang0);
-    for (let k = 0; k <= HC; k++) {
-      const u = k / HC, w = Math.pow(u, 1.6);
-      // the root stays put; the ends lift outward and sweep sideways, with a ripple running down the strand
-      const ripple = 0.05 * st.puff * Math.sin(u * 7 - t * 7 + st.phase) * u;
-      const ang = ang0 + st.sway * w + ripple;
-      const rr = rin * (1 + u * st.ext * (1 + 0.22 * st.puff * w));
-      const id = (j * (HC + 1) + k) * 3;
-      pos[id] = cx + Math.cos(ang) * rr; pos[id + 1] = -(cy + Math.sin(ang) * rr); pos[id + 2] = 0.2 + 18 * st.puff * w;
-    }
-  }
-  st.geom.attributes.position.needsUpdate = true;
-}
-function updateHair(b, t, dt, el, opening) {
-  for (const st of b.hair.strands) {
-    let swayT = 0, puffT = 0;
-    if (opening && el >= st.delay) {
-      // floating in the rising draft from the open book, swaying on two slow winds
-      puffT = 0.55 + 0.12 * Math.sin(t * 0.9 + st.phase);
-      swayT = st.side * 0.05 + 0.11 * Math.sin(t * st.freq + st.phase) + 0.05 * Math.sin(t * 3.1 + st.phase * 1.7);
-      if (!st.launched) { st.launched = true; st.puffV += 6 + Math.random() * 3; st.swayV += st.side * (1.5 + Math.random()); }
-    }
-    const K = st.K, C = 2 * (opening ? 0.28 : 0.6) * Math.sqrt(K);
-    const steps = Math.max(1, Math.ceil(dt / (1 / 240))), h = dt / steps;
-    for (let s2 = 0; s2 < steps; s2++) {
-      st.puffV += (K * (puffT - st.puff) - C * st.puffV) * h; st.puff += st.puffV * h;
-      st.swayV += (K * (swayT - st.sway) - C * st.swayV) * h; st.sway += st.swayV * h;
-    }
-    st.mesh.material.uniforms.lift.value = clamp(st.puff, 0, 1);
-    bendHair(b, st, t);
-  }
-}
-
-/* ---------- hair lying over the face: split from the face by colour, then moved as its own layer ---------- */
-function separateHair(f, faceC, raw, ts) {
+// the face halves get skin where hair lay across them, so the hair can leave
+function inpaintCover(faceC, HM, f, ts, raw) {
   const w = faceC.width, h = faceC.height;
-  const rc = mk(w, h), rcx = rc.getContext('2d', { willReadFrequently: true }); rcx.drawImage(faceC, 0, 0);
-  const d = rcx.getImageData(0, 0, w, h).data;
-  const mc = mk(w, h), mcx = mc.getContext('2d', { willReadFrequently: true }); mcx.drawImage(raw, 0, 0);
-  const md = mcx.getImageData(0, 0, w, h).data;
-  const T = (lx, ly) => [(lx - f.minX) * ts, (ly - f.minY) * ts];
-  let sr = 0, sg = 0, sb = 0, n = 0;
-  for (const q of f.skin) { const [x, y] = T(q.x, q.y); for (let dy = -4; dy <= 4; dy++) for (let dx = -4; dx <= 4; dx++) { const X = clamp(Math.round(x + dx * ts), 0, w - 1), Y = clamp(Math.round(y + dy * ts), 0, h - 1), i = (Y * w + X) * 4; sr += d[i]; sg += d[i + 1]; sb += d[i + 2]; n++; } }
-  sr /= n; sg /= n; sb /= n; const sl = 0.299 * sr + 0.587 * sg + 0.114 * sb;
-  const spX = (f.spineX - f.minX) * ts, half = w / 2, noseY = (f.noseY - f.minY) * ts;
-  const feats = f.feats.map(e => { const [x, y] = T(e.x, e.y); return { x, y, rx: e.rx * ts, ry: e.ry * ts }; });
-  const hm = mk(w, h), hx = hm.getContext('2d', { willReadFrequently: true }), out = hx.createImageData(w, h), o = out.data;
-  let sum = 0;
-  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
-    const i = (y * w + x) * 4; if (md[i + 3] < 128) continue;
-    const dr = d[i] - sr, dg = d[i + 1] - sg, db = d[i + 2] - sb, l = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
-    const dist = Math.max(Math.sqrt(0.35 * dr * dr + 0.45 * dg * dg + 0.2 * db * db) / 255, Math.abs(l - sl) / 255 * 1.1);
-    let pr = smooth(0.15, 0.27, dist);
-    if (y > noseY) pr *= smooth(0.5, 0.8, Math.abs(x - spX) / half);
-    for (const e of feats) { const q = ((x - e.x) / e.rx) ** 2 + ((y - e.y) / e.ry) ** 2; if (q < 1.7) pr *= smooth(1.0, 1.7, q); }
-    o[i + 3] = pr * 255; sum += pr;
-  }
-  // keep only hair that reaches in from the outline of the face (hair grows from outside the face)
-  const keep = new Uint8Array(w * h), q = new Int32Array(w * h); let qh = 0, qt = 0;
-  const cand = i => o[i * 4 + 3] > 110;
-  const edge = (x, y) => { for (const [ox, oy] of [[-3, 0], [3, 0], [0, -3], [0, 3]]) { const X = x + ox * ts, Y = y + oy * ts; if (X < 0 || Y < 0 || X >= w || Y >= h || md[((Y | 0) * w + (X | 0)) * 4 + 3] < 128) return true; } return false; };
-  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { const i = y * w + x; if (cand(i) && md[i * 4 + 3] >= 128 && edge(x, y)) { keep[i] = 1; q[qt++] = i; } }
-  while (qh < qt) { const i = q[qh++], x = i % w, y = (i / w) | 0; for (const j of [i - 1, i + 1, i - w, i + w]) { if (j < 0 || j >= w * h || keep[j]) continue; const jx = j % w; if (Math.abs(jx - x) > 1) continue; if (cand(j)) { keep[j] = 1; q[qt++] = j; } } }
-  sum = 0; for (let i = 0; i < w * h; i++) { if (!keep[i]) o[i * 4 + 3] = 0; else sum++; }
-  if (sum < w * h * 0.01) return null;
-  hx.putImageData(out, 0, 0);
-  // clean the mask: soften, then pull back to a firm edge
-  const bl = mk(w, h), bx = bl.getContext('2d', { willReadFrequently: true }); bx.filter = `blur(${Math.max(1.5, ts * 2.2)}px)`; bx.drawImage(hm, 0, 0); bx.filter = 'none';
-  const bd = bx.getImageData(0, 0, w, h); for (let i = 3; i < bd.data.length; i += 4) bd.data[i] = 255 * smooth(0.3, 0.62, bd.data[i] / 255); bx.putImageData(bd, 0, 0);
-  const hair = mk(w, h), hcx = hair.getContext('2d'); hcx.drawImage(faceC, 0, 0); maskWith(hair, bl);
-  // the face underneath gets a plain skin tone where the hair was
+  const m = mk(w, h), mx = m.getContext('2d');
+  mx.drawImage(HM.mask, (HM.x0 - f.minX) * ts, (HM.y0 - f.minY) * ts, HM.w * ts / HM.ts2, HM.h * ts / HM.ts2);
+  // fill the hair area from the surrounding skin: the face with the hair cut out, smeared inward at growing radii
+  const holed = mk(w, h), hx = holed.getContext('2d'); hx.drawImage(faceC, 0, 0); hx.globalCompositeOperation = 'destination-out'; hx.drawImage(m, 0, 0); hx.drawImage(m, 0, 0);
   const sk = mk(w, h), skx = sk.getContext('2d');
-  const gr = skx.createLinearGradient(0, 0, 0, h); gr.addColorStop(0, `rgb(${sr * 0.92 | 0},${sg * 0.9 | 0},${sb * 0.9 | 0})`); gr.addColorStop(1, `rgb(${sr | 0},${sg | 0},${sb | 0})`);
-  skx.fillStyle = gr; skx.fillRect(0, 0, w, h); maskWith(sk, bl);
-  const cover = mk(w, h), cx2 = cover.getContext('2d'); cx2.drawImage(faceC, 0, 0); cx2.drawImage(sk, 0, 0);
-  return { cover, hair };
+  for (const r of [3, 7, 14, 28, 56]) { skx.globalCompositeOperation = 'destination-over'; skx.filter = `blur(${r * ts}px)`; skx.drawImage(holed, 0, 0); }
+  skx.filter = 'none'; skx.globalCompositeOperation = 'source-over'; skx.drawImage(holed, 0, 0);
+  maskWith(sk, m);
+  const cover = mk(w, h), cx = cover.getContext('2d'); cx.drawImage(faceC, 0, 0); cx.drawImage(sk, 0, 0);
+  return cover;
 }
-const FN = 22;
-function createFringe(b, canvas) {
-  const f = b.f, W = f.maxX - f.minX, H = f.maxY - f.minY, n = (FN + 1) * (FN + 1);
+const HN = 36;
+function createHairLayer(b, HM) {
+  const f = b.f, n = (HN + 1) * (HN + 1), lw = HM.w / HM.ts2, lh = HM.h / HM.ts2;
   const rest = new Float32Array(n * 2), uv = new Float32Array(n * 2), idx = [];
-  for (let j = 0; j <= FN; j++) for (let i = 0; i <= FN; i++) { const k = j * (FN + 1) + i; rest[k * 2] = f.minX + i / FN * W; rest[k * 2 + 1] = f.minY + j / FN * H; uv[k * 2] = i / FN; uv[k * 2 + 1] = 1 - j / FN; }
-  for (let j = 0; j < FN; j++) for (let i = 0; i < FN; i++) { const a = j * (FN + 1) + i, b2 = a + 1, c = a + FN + 1, d = c + 1; idx.push(a, c, b2, b2, c, d); }
-  const g = new THREE.BufferGeometry(); g.setIndex(idx);
-  g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(n * 3), 3));
-  const nor = new Float32Array(n * 3); for (let q = 2; q < nor.length; q += 3) nor[q] = 1;
-  g.setAttribute('normal', new THREE.BufferAttribute(nor, 3)); g.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
-  const mat = new THREE.ShaderMaterial({ uniforms: { ...U, front: { value: tex(canvas) } }, vertexShader: VS, fragmentShader: FS_FRINGE, transparent: true, depthTest: false, depthWrite: false });
-  const mesh = new THREE.Mesh(g, mat); mesh.frustumCulled = false; mesh.renderOrder = 20;
-  b.group.add(mesh);
-  b.fringe = { mesh, geom: g, rest, W, H, px: f.spineX, py: f.minY - 0.12 * H, phi: 0, phiV: 0, lift: 0, liftV: 0, launched: false };
-  bendFringe(b, 0);
+  for (let j = 0; j <= HN; j++) for (let i = 0; i <= HN; i++) { const k = j * (HN + 1) + i; rest[k * 2] = HM.x0 + i / HN * lw; rest[k * 2 + 1] = HM.y0 + j / HN * lh; uv[k * 2] = i / HN; uv[k * 2 + 1] = 1 - j / HN; }
+  for (let j = 0; j < HN; j++) for (let i = 0; i < HN; i++) { const a = j * (HN + 1) + i, b2 = a + 1, c = a + HN + 1, d = c + 1; idx.push(a, c, b2, b2, c, d); }
+  const mkMesh = (canvas, order, z, moving) => {
+    const g = new THREE.BufferGeometry(); g.setIndex(idx);
+    const pos = new Float32Array(n * 3); for (let k = 0; k < n; k++) { pos[k * 3] = rest[k * 2]; pos[k * 3 + 1] = -rest[k * 2 + 1]; pos[k * 3 + 2] = z; }
+    g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    const nor = new Float32Array(n * 3); for (let q = 2; q < nor.length; q += 3) nor[q] = 1;
+    g.setAttribute('normal', new THREE.BufferAttribute(nor, 3)); g.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+    const mat = new THREE.ShaderMaterial({ uniforms: { ...U, front: { value: tex(canvas) } }, vertexShader: VS, fragmentShader: FS_FRINGE, transparent: true, depthTest: false, depthWrite: false });
+    const mesh = new THREE.Mesh(g, mat); mesh.frustumCulled = false; mesh.renderOrder = order; b.group.add(mesh); return { mesh, geom: g };
+  };
+  const under = mkMesh(HM.under, 0.3, 0.1);
+  const layer = mkMesh(HM.hair, 20, 4);
+  // the scalp: roots stay put along this arc; strands hang from it
+  const cx = f.spineX, cy = (f.minY + f.maxY) / 2 - 0.05 * HM.H, rx = 0.62 * HM.W, top = f.minY - 0.3 * HM.H;
+  const rootY = x => { const u = (x - cx) / rx; return Math.abs(u) < 1 ? cy - (cy - top) * Math.sqrt(1 - u * u) : cy; };
+  b.hairL = { layer, under, rest, n, rootY, cx, W: HM.W, H: HM.H, phi: 0, phiV: 0, lift: 0, liftV: 0, launched: false };
 }
-function bendFringe(b, t) {
-  const F = b.fringe, pos = F.geom.attributes.position.array, n = F.rest.length / 2;
-  for (let k = 0; k < n; k++) {
-    const x = F.rest[k * 2], y = F.rest[k * 2 + 1];
-    const s = Math.tanh((x - F.px) / (0.07 * F.W));
-    const w = Math.pow(clamp((y - F.py) / (F.H * 1.1), 0, 1), 1.15);
-    const sway = F.lift * 0.07 * Math.sin(t * 2.2 + x * 0.025 + s) * w;
-    const a = -s * F.phi * w + sway;
-    const dx = x - F.px, dy = y - F.py;
-    let X = F.px + Math.cos(a) * dx - Math.sin(a) * dy + s * F.phi * w * F.W * 0.1;
-    let Y = F.py + Math.sin(a) * dx + Math.cos(a) * dy - F.lift * w * F.H * 0.05;
-    pos[k * 3] = X; pos[k * 3 + 1] = -Y; pos[k * 3 + 2] = 4 + F.lift * w * F.H * 0.2;
+function bendHairLayer(b, t) {
+  const L = b.hairL, pos = L.layer.geom.attributes.position.array;
+  for (let k = 0; k < L.n; k++) {
+    const x = L.rest[k * 2], y = L.rest[k * 2 + 1], ry = L.rootY(x);
+    const w = Math.pow(clamp((y - ry) / (1.05 * L.H), 0, 1), 1.2);
+    if (w <= 0) { pos[k * 3] = x; pos[k * 3 + 1] = -y; pos[k * 3 + 2] = 4; continue; }
+    const s = Math.tanh((x - L.cx) / (0.1 * L.W));
+    // each strand swings from its own root: the parting pushes the two sides apart, a wave runs down to the tips
+    const a = -s * L.phi * w + L.lift * w * (0.09 * Math.sin(t * 2.1 - w * 3.2 + x * 0.012) + 0.035 * Math.sin(t * 3.7 + x * 0.03));
+    const dx = 0, dy = y - ry, ca = Math.cos(a), sa = Math.sin(a);
+    pos[k * 3] = x + dx * ca - dy * sa + s * L.phi * w * L.W * 0.05;
+    pos[k * 3 + 1] = -(ry + dx * sa + dy * ca - L.lift * w * L.H * 0.03);
+    pos[k * 3 + 2] = 4 + L.lift * w * L.H * 0.12;
   }
-  F.geom.attributes.position.needsUpdate = true;
+  L.layer.geom.attributes.position.needsUpdate = true;
 }
-function updateFringe(b, t, dt, el, opening) {
-  const F = b.fringe;
+function updateHairLayer(b, t, dt, el, opening) {
+  const L = b.hairL;
   let pt = 0, lt = 0;
-  if (opening && el >= IMPACT_AT + 0.02) { pt = 0.3 + 0.05 * Math.sin(t * 1.3); lt = 1; if (!F.launched) { F.launched = true; F.phiV += 3; F.liftV += 5; } }
-  const K = 38, C = 2 * (opening ? 0.32 : 0.75) * Math.sqrt(K), steps = Math.max(1, Math.ceil(dt / (1 / 240))), h = dt / steps;
-  for (let i = 0; i < steps; i++) { F.phiV += (K * (pt - F.phi) - C * F.phiV) * h; F.phi += F.phiV * h; F.liftV += (K * (lt - F.lift) - C * F.liftV) * h; F.lift += F.liftV * h; }
-  bendFringe(b, t);
+  if (opening && el >= IMPACT_AT + 0.02) { pt = 0.3 + 0.04 * Math.sin(t * 1.2); lt = 1; if (!L.launched) { L.launched = true; L.phiV += 3.4; L.liftV += 5; } }
+  const K = 36, C = 2 * (opening ? 0.3 : 0.75) * Math.sqrt(K), steps = Math.max(1, Math.ceil(dt / (1 / 240))), h = dt / steps;
+  for (let i = 0; i < steps; i++) { L.phiV += (K * (pt - L.phi) - C * L.phiV) * h; L.phi += L.phiV * h; L.liftV += (K * (lt - L.lift) - C * L.liftV) * h; L.lift += L.liftV * h; }
+  bendHairLayer(b, t);
 }
 
 /* ---------- FX (2D overlay) ---------- */
@@ -994,12 +955,43 @@ function thump(at, vol) {
   g.gain.setValueAtTime(0.0001, a.currentTime + at); g.gain.exponentialRampToValueAtTime(vol, a.currentTime + at + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, a.currentTime + at + 0.35);
   o.connect(g).connect(a.destination); o.start(a.currentTime + at); o.stop(a.currentTime + at + 0.4);
 }
+// a page turning: fibre crackle riding on an airy swell, ending in a soft flap; every one slightly different
+function flipBuffer(a, dur) {
+  const sr = a.sampleRate, n = Math.floor(sr * dur), buf = a.createBuffer(1, n, sr), d = buf.getChannelData(0);
+  const peak = 0.3 + Math.random() * 0.25;
+  let crackle = 0, lp = 0;
+  for (let i = 0; i < n; i++) {
+    const t = i / n;
+    const env = t < peak ? Math.pow(t / peak, 1.6) : Math.pow(1 - (t - peak) / (1 - peak), 2.2);
+    if (Math.random() < 0.0025 + 0.004 * env) crackle += 0.6 + Math.random();      // a fibre snaps
+    crackle *= 0.985;
+    const w = Math.random() * 2 - 1; lp += (w - lp) * 0.35;                           // air: slightly darker noise
+    d[i] = env * (0.55 * lp + 0.45 * w * Math.min(1.5, 0.25 + crackle));
+  }
+  // the flap at the end
+  const fs = Math.floor(n * (0.82 + Math.random() * 0.1));
+  for (let i = fs; i < n; i++) { const k = (i - fs) / sr; d[i] += Math.sin(2 * Math.PI * (90 + Math.random() * 4) * k) * Math.exp(-k * 60) * 0.35; }
+  return buf;
+}
+function paperFlip(at, vol = 0.22) {
+  const a = audio(); if (!a) return;
+  const dur = 0.16 + Math.random() * 0.12, s = a.createBufferSource(); s.buffer = flipBuffer(a, dur); s.playbackRate.value = 0.9 + Math.random() * 0.25;
+  const hp = a.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 350 + Math.random() * 200;
+  const bp = a.createBiquadFilter(); bp.type = 'peaking'; bp.gain.value = 5; bp.Q.value = 0.8;
+  const f0 = 3800 + Math.random() * 1500; bp.frequency.setValueAtTime(f0, a.currentTime + at); bp.frequency.exponentialRampToValueAtTime(f0 * 0.45, a.currentTime + at + dur);
+  const lp = a.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 7500;
+  const g = a.createGain(); g.gain.value = vol;
+  let node = s.connect(hp).connect(bp).connect(lp).connect(g);
+  if (a.createStereoPanner) { const pn = a.createStereoPanner(); pn.pan.value = (Math.random() - 0.5) * 0.8; node = node.connect(pn); }
+  node.connect(a.destination); s.start(a.currentTime + at);
+}
 function sndOpen() {
   noise(0, IMPACT_AT, 400, 4200, 0.18, 'bandpass', 2.5);          // rising tear
   thump(IMPACT_AT, 0.6); noise(IMPACT_AT, 0.16, 6000, 2500, 0.35, 'highpass', 0.5);
-  [0.31, 0.35, 0.385, 0.415, 0.44].forEach(d => { noise(d, 0.08, 2200 + Math.random() * 1600, 1300, 0.2, 'bandpass', 1.2); noise(d + 0.012, 0.07, 2600 + Math.random() * 1600, 1500, 0.16, 'bandpass', 1.2); });
+  [0.27, 0.31, 0.35, 0.385, 0.415, 0.44].forEach((d, i) => paperFlip(d + Math.random() * 0.015, i === 0 ? 0.3 : 0.2 + Math.random() * 0.06));
+  [1.1, 1.16, 1.21].forEach(d => paperFlip(d + Math.random() * 0.03, 0.12));   // the pages settle
 }
-function sndClose() { for (let i = 0; i < 5; i++) noise(i * 0.035, 0.06, 2600, 1400, 0.12); noise(0.4, 0.16, 1200, 250, 0.45, 'lowpass', 0.7); thump(0.42, 0.35); }
+function sndClose() { for (let i = 0; i < 5; i++) paperFlip(i * 0.04 + Math.random() * 0.01, 0.16); noise(0.4, 0.16, 1200, 250, 0.45, 'lowpass', 0.7); thump(0.42, 0.35); }
 
 /* ---------- SFX lettering, driven by the frame clock ---------- */
 let sfxState = null, hudHold = 0;
@@ -1059,7 +1051,7 @@ stage.addEventListener('pointermove', e => {
   const d = clamp(drag.d0 + (e.clientX - drag.x0) * drag.side / (drag.w * 0.9), 0, 1);
   if (Math.abs(e.clientX - drag.x0) > 6) drag.moved = true;
   if (drag.side < 0) dragOpen.L = d; else dragOpen.R = d;
-  if (Math.abs(e.clientX - drag.x0) > 30 && Math.random() < 0.12) noise(0, 0.07, 2400 + Math.random() * 1500, 1400, 0.12, 'bandpass', 1.2);
+  if (Math.abs(e.clientX - drag.x0) > 30 && Math.random() < 0.08) paperFlip(0, 0.14);
 });
 let lastDragMoved = false;
 const endDrag = e => { if (drag && (!e || e.pointerId === drag.id)) { lastDragMoved = !!drag.moved; drag = null; stage.classList.remove('dragging'); } };
