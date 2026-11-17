@@ -683,7 +683,8 @@ function updateBook(b, t, dt) {
         let target = p.target;
         // dragging spreads that side further, up to lying almost flat outward
         const dd = p.side < 0 ? dragOpen.L : dragOpen.R;
-        if (dd > 0) { const maxT = p.isCover ? 3.02 : 2.75 + p.k * 0.05; target += (maxT - target) * dd; }
+        if (dd > 0) { const maxT = p.isCover ? 3.08 : 2.8 + p.k * 0.05; target += (maxT - target) * dd; }
+        else if (dd < 0) { const minT = p.isCover ? 0.32 : 0.1 + p.k * 0.045; target += (minT - target) * -dd; }   // drag back: the pages return toward the face
         p.eff = target;
         tgt = target + (el > p.delay + 1.2 ? (p.isCover ? 0.015 : target < 0.2 ? 0.01 : 0.045) * Math.sin(t * 1.7 + p.phase) : 0);
       }
@@ -1148,7 +1149,7 @@ stage.addEventListener('pointerdown', e => {
 });
 stage.addEventListener('pointermove', e => {
   if (!drag || e.pointerId !== drag.id) return;
-  const d = clamp(drag.d0 + (e.clientX - drag.x0) * drag.side / (drag.w * 0.9), 0, 1);
+  const d = clamp(drag.d0 + (e.clientX - drag.x0) * drag.side / (drag.w * 0.7), -1, 1);
   if (Math.abs(e.clientX - drag.x0) > 6) drag.moved = true;
   if (drag.side < 0) dragOpen.L = d; else dragOpen.R = d;
   if (Math.abs(e.clientX - drag.x0) > 30 && Math.random() < 0.08) paperFlip(0, 0.14);
