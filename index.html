@@ -335,11 +335,19 @@ function frameFromLandmarks(pts) {
   const topY = browY - (0.42 - 0.2 * Math.min(1, Math.abs(yaw) * 1.6)) * (chinY - browY);
   const j0 = jaw[0], j16 = jaw[16];
   const cx = (j0.x + j16.x) / 2, cy = (j0.y + j16.y) / 2, rx = (j16.x - j0.x) / 2, ry = cy - topY;
-  let poly = jaw.map(p => ({ x: p.x, y: p.y }));
-  // forehead: narrower toward the top (temples), so the sheet stays inside the hairline
-  for (let i = 1; i < 24; i++) { const t = i / 24 * Math.PI, st = Math.sin(t); poly.push({ x: cx + rx * Math.cos(t) * (1 - 0.12 * st), y: cy - ry * st }); }
   const mx = cx, my = (topY + chinY) / 2;
-  poly = poly.map(p => ({ x: mx + (p.x - mx) * 1.11, y: my + (p.y - my) * 1.05 }));
+  // jaw and cheeks: pushed out a little so no skin is cut off; ear-level points are left as they are
+  let poly = jaw.map((p, i) => { const k = i >= 3 && i <= 13 ? 1.08 : 1.02; return { x: mx + (p.x - mx) * k, y: my + (p.y - my) * (i >= 3 && i <= 13 ? 1.04 : 1.0) }; });
+  // forehead: as wide as the jaw where it meets it, narrowing to the brow span toward the top;
+  // on a turned face the far side is narrower still
+  const browHalf = (L[26].x - L[17].x) / 2 * 1.05, browCx = (L[17].x + L[26].x) / 2, far = yaw < 0 ? 1 : -1, farK = 1 - 0.6 * Math.min(0.6, Math.abs(yaw));
+  for (let i = 1; i < 24; i++) {
+    const t = i / 24 * Math.PI, st = Math.sin(t), ct = Math.cos(t);
+    const half = rx + (browHalf - rx) * Math.pow(st, 1.5), ccx = cx + (browCx - cx) * st;
+    let x = ccx + half * ct * (1 - 0.1 * st);
+    if (Math.sign(ct) === far) x = ccx + (x - ccx) * (1 - (1 - farK) * st);
+    poly.push({ x, y: cy - ry * st });
+  }
   const spineX = avg([L[28], L[29], L[30], L[33], L[51], L[57]]).x;
   const core = bbox([...jaw, ...L.slice(17, 27), { x: cx, y: browY - 0.3 * (chinY - browY) }]);
   for (let it = 0; it < 2; it++) { const q = []; for (let i = 0; i < poly.length; i++) { const a = poly[i], b2 = poly[(i + 1) % poly.length]; q.push({ x: a.x * 0.75 + b2.x * 0.25, y: a.y * 0.75 + b2.y * 0.25 }, { x: a.x * 0.25 + b2.x * 0.75, y: a.y * 0.25 + b2.y * 0.75 }); } poly = q; }
