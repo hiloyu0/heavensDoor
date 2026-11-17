@@ -553,7 +553,8 @@ function createBook(face, idx) {
   const raw = mk(Wp, Hp), rx = raw.getContext('2d'); rx.fillStyle = '#000'; polyPath(rx, f.poly, f, ts); rx.fill();
   let coverSrc = faceC;
   const HM = hairOn && f.skin ? hairMaskFor(f) : null;
-  if (HM) coverSrc = inpaintCover(faceC, HM, f, ts, raw);
+  let hairFM = null;
+  if (HM) { coverSrc = inpaintCover(faceC, HM, f, ts, raw); hairFM = mk(Wp, Hp); hairFM.getContext('2d').drawImage(HM.mask, (HM.x0 - f.minX) * ts, (HM.y0 - f.minY) * ts, HM.w * ts / HM.ts2, HM.h * ts / HM.ts2); }
   // the face surface becomes a sheet with the eyes, nostrils and mouth cut out
   const holes = f.feats ? holeShapes(f) : [];
   const holesC = mk(Wp, Hp), hcx = holesC.getContext('2d'); hcx.filter = `blur(${Math.max(0.8, ts * 0.9)}px)`; hcx.fillStyle = '#000'; drawHoles(hcx, holes, f, ts); hcx.fill();
@@ -580,11 +581,11 @@ function createBook(face, idx) {
   const w = hf.sw, h = Hp, m = crop(maskC, hf.sx, hf.sw), mf = crop(maskC, hf.sx, hf.sw, true);
   const B = boundsOf(crop(raw, hf.sx, hf.sw)), Bf = B.flip();
   const soft = blurred(m, Math.max(6, ts * 9));
-  const rim = rimOf(m, Math.max(3, ts * 3), 'rgba(110,78,50,0.5)');
-  const rimF = rimOf(mf, Math.max(3, ts * 3), 'rgba(110,78,50,0.45)');
+  const rim = rimOf(m, Math.max(2, ts * 1.6), 'rgba(110,78,50,0.28)');
+  const rimF = rimOf(mf, Math.max(2, ts * 1.6), 'rgba(110,78,50,0.25)');
   const box = { left: w * 0.05, right: w * 0.95, top: 0, bottom: h };
   // the cut edge around each hole: a bright paper edge
-  const cutEdge = (c, flip) => { const x = c.getContext('2d'); x.save(); x.globalCompositeOperation = 'source-atop'; x.strokeStyle = 'rgba(255,248,232,0.95)'; x.lineWidth = Math.max(1.5, ts * 1.8); drawHoles(x, holes, f, ts, flip ? w : 0, 1.04, hf.sx); x.stroke(); x.strokeStyle = 'rgba(90,60,40,0.18)'; x.lineWidth = Math.max(1, ts * 0.7); drawHoles(x, holes, f, ts, flip ? w : 0, 1.1, hf.sx); x.stroke(); x.restore(); };
+  const cutEdge = (c, flip) => { const x = c.getContext('2d'); x.save(); x.globalCompositeOperation = 'source-atop'; x.strokeStyle = 'rgba(255,248,232,0.85)'; x.lineWidth = Math.max(1, ts * 1.0); drawHoles(x, holes, f, ts, flip ? w : 0, 1.04, hf.sx); x.stroke(); x.strokeStyle = 'rgba(90,60,40,0.18)'; x.lineWidth = Math.max(1, ts * 0.7); drawHoles(x, holes, f, ts, flip ? w : 0, 1.1, hf.sx); x.stroke(); x.restore(); };
   for (let k = 0; k <= NPAGES; k++) {
     const isCover = k === NPAGES;
     let front, back = mk(w, h); const bx = back.getContext('2d');
@@ -610,7 +611,7 @@ function createBook(face, idx) {
     const L = double ? (hf.side > 0 ? f.maxX - f.spineX : f.spineX - f.minX) : W;
     const p = { mesh, geom, smesh, sgeom, side: hf.side, k, isCover, L, hx: hf.side > 0 ? f.maxX : f.minX, zOff: (k + 1) * 0.8,
       sx: isCover ? 1 : 1 - (NPAGES - k) * 0.01 + (r() - .5) * 0.02, sy: isCover ? 1 : 1 - (NPAGES - k) * 0.006 + (r() - .5) * 0.015,
-      target: isCover ? (double ? 2.86 : coverT) : (double ? 2.86 - (NPAGES - k) * 0.15 : Math.max(1.95, coverT - (NPAGES - k) * 0.15)) + (r() - .5) * 0.03,
+      target: isCover ? (double ? 2.86 : coverT) : (double ? 2.86 - (NPAGES - k) * 0.15 : Math.max(1.75, coverT - (NPAGES - k) * 0.21)) + (r() - .5) * 0.03,
       curl: 0.22 + r() * 0.32,
       delay: (isCover ? 0.26 : 0.36 + [0, 0.05, 0.09, 0.125, 0.155][NPAGES - 1 - k]) + (hf.side > 0 ? 0.015 : 0),
       K: isCover ? 120 : 80 + r() * 60, zeta: isCover ? 0.5 : 0.34 + r() * 0.14,
@@ -629,7 +630,7 @@ function createBook(face, idx) {
   gx.setTransform(1, 0, 0, 2, 0, 0); gx.fillStyle = gg; gx.fillRect(0, 0, 128, 128);
   const glow = new THREE.Mesh(new THREE.PlaneGeometry(W * 0.8, H * 0.9), new THREE.MeshBasicMaterial({ map: tex(gc), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, opacity: 0 }));
   glow.position.set(openMode === 'double' ? f.spineX : (singleSide < 0 ? f.minX + W * 0.15 : f.maxX - W * 0.15), -(f.minY + f.maxY) / 2, 0.5); glow.renderOrder = 2.5; group.add(glow);
-  const book = { face, f, group, pages, base, baseC, raw, faceSrc: coverSrc, faceOrig: faceC, singleSide, holesC, Bfull, ts, mode: openMode, spP, seed, glow, lines: pick(9), state: 'opening', t0: now(), inkT: 0, inkShown: -1, idx, inkPage: null, inkPen: null };
+  const book = { face, f, group, pages, base, baseC, raw, faceSrc: coverSrc, faceOrig: faceC, fit: 1, hairFM, singleSide, holesC, Bfull, ts, mode: openMode, spP, seed, glow, lines: pick(9), state: 'opening', t0: now(), inkT: 0, inkShown: -1, idx, inkPage: null, inkPen: null };
   renderBase(book, 0);
   if (HM) createHairLayer(book, HM);
   scene.add(group); placeBook(book);
@@ -668,7 +669,8 @@ function renderBase(b, reveal) {
   vText(px, [{ t: `記録　第${no}号`, s: 1.15, c: '#2a1a1e' }, { t: `いまの気分　${mood}`, c: '#5a3a2a' }, ...b.lines], { left: w * 0.03, right: w * 0.97, top: 0, bottom: h }, fsz, 'rgba(22,16,20,0.97)', b.seed + 1, null, b.Bfull);
   px.globalCompositeOperation = 'destination-out'; px.drawImage(b.holesC, 0, 0);
   // skin turns to printed paper but keeps the face's own shading
-  x.globalCompositeOperation = 'multiply'; x.drawImage(pc, 0, 0);
+  x.globalCompositeOperation = 'multiply'; x.drawImage(pc, 0, 0); x.globalCompositeOperation = 'source-over';
+  if (b.hairFM) { const hk = mk(w, h), hkx = hk.getContext('2d'); hkx.drawImage(b.faceOrig, 0, 0); maskWith(hk, b.hairFM); x.drawImage(hk, 0, 0); }
   x.globalCompositeOperation = 'source-over';
   const keep = mk(w, h), kx = keep.getContext('2d'); kx.drawImage(b.faceOrig, 0, 0);
   const km = mk(w, h), kmx = km.getContext('2d'); kmx.filter = `blur(${ts * 2}px)`; kmx.fillStyle = '#000'; drawHoles(kmx, holeShapes(f), f, ts, 0, 1.06); kmx.fill();
@@ -705,6 +707,7 @@ function updateBook(b, t, dt) {
       else if (el < p.delay) tgt = 0;
       else {
         let target = p.target;
+        if (b.mode !== 'double' && target > Math.PI / 2) target = Math.PI / 2 + (target - Math.PI / 2) * b.fit;
         // dragging spreads that side further, up to lying almost flat outward
         const dd = p.side < 0 ? dragOpen.L : dragOpen.R;
         if (dd > 0) { const maxT = p.isCover ? 3.08 : 2.8 + p.k * 0.05; target += (maxT - target) * dd; }
@@ -744,6 +747,16 @@ function updateBook(b, t, dt) {
   if (cov && !b.recessOn && cov.theta > 0.3) { b.recessOn = true; renderBase(b, Math.max(0, b.inkShown)); }
   if (cov && b.recessOn && !opening && cov.theta < 0.15) { b.recessOn = false; renderBase(b, Math.max(0, b.inkShown)); }
   b.glow.material.opacity = opening ? smooth(0.3, 0.9, el) * (0.22 + 0.04 * Math.sin(t * 3.1)) : Math.max(0, b.glow.material.opacity - dt * 2.5);
+  if (opening && el > 0.8 && b.mode !== 'double') {
+    // keep every page's free edge inside the picture with a margin
+    const mg = Math.min(dispW, dispH) * 0.05; let out = false, roomy = true;
+    for (const p of b.pages) { if (!p.mesh.visible) continue; for (const row of [0, ROWS >> 1, ROWS]) {
+      const a = p.geom.attributes.position.array, k = (row * (COLS + 1) + COLS) * 3; v3.set(a[k], a[k + 1], a[k + 2]); b.group.localToWorld(v3); v3.project(camera);
+      const sx = (v3.x + 1) / 2 * dispW, sy = (1 - v3.y) / 2 * dispH;
+      if (sx < mg || sx > dispW - mg || sy < mg || sy > dispH - mg) out = true;
+      if (sx < mg * 2.5 || sx > dispW - mg * 2.5 || sy < mg * 2.5 || sy > dispH - mg * 2.5) roomy = false; } }
+    if (out) b.fit = Math.max(0.25, b.fit - dt * 0.9); else if (roomy) b.fit = Math.min(1, b.fit + dt * 0.2);
+  }
   if (opening && el > 2) b.state = 'open';
   if (!opening && el > 0.4 && settled) b.state = 'closed';
   // vermilion handwriting, a dozen characters a second
@@ -1020,13 +1033,13 @@ function drawFx(t, dt) {
         const fr = (f.maxY - f.minY) * sc * 0.5, R = Math.hypot(dispW, dispH);
         // seam: a straight hairline of light that runs down the split, then tears
         if (e < IMPACT_AT + 0.25) {
-          const q = smooth(0.02, IMPACT_AT - 0.02, e), fade = 1 - smooth(IMPACT_AT + 0.05, IMPACT_AT + 0.25, e);
+          const q = smooth(0.02, IMPACT_AT - 0.02, e), fade = 1 - smooth(IMPACT_AT + 0.02, IMPACT_AT + 0.14, e);
           // the free edge lights up along the right side of the face, top to bottom
           const edge = b.mode === 'double' ? Array.from({ length: 24 }, (_, i) => toDisp(f, f.spineX, f.minY + 4 + (f.maxY - f.minY - 8) * i / 23)) : f.poly.filter(pt => (pt.x - f.spineX) * -b.singleSide > (f.maxX - f.minX) * 0.12).sort((u, v) => u.y - v.y).map(pt => toDisp(f, pt.x, pt.y));
           const nUse = Math.max(2, Math.ceil(edge.length * q)), path = edge.slice(0, nUse);
           const [bx2, by2] = path[path.length - 1];
           fxx.save(); fxx.globalAlpha = fade; fxx.lineCap = 'round'; fxx.lineJoin = 'round';
-          fxx.strokeStyle = impact ? '#ffffff' : 'rgba(255,214,140,0.9)'; fxx.shadowColor = impact ? '#ffffff' : '#ffcf7a'; fxx.shadowBlur = 22; fxx.lineWidth = 3 + 5 * smooth(IMPACT_AT - 0.08, IMPACT_AT, e);
+          fxx.strokeStyle = impact ? '#ffffff' : 'rgba(255,244,220,0.6)'; fxx.shadowColor = impact ? '#ffffff' : '#fff4dc'; fxx.shadowBlur = 22; fxx.lineWidth = 3 + 5 * smooth(IMPACT_AT - 0.08, IMPACT_AT, e);
           fxx.beginPath(); path.forEach(([x, y], i) => i ? fxx.lineTo(x, y) : fxx.moveTo(x, y)); fxx.stroke();
           fxx.shadowBlur = 0; fxx.strokeStyle = '#fffaf0'; fxx.lineWidth = 1.4; fxx.stroke();
           // spark at the leading point
