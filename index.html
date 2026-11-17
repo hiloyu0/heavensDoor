@@ -210,13 +210,13 @@ void main(){
   float amt = kind < 0.5 ? uGrade : uGrade * 0.22;
   // keep the vermilion ink vivid
   if (kind > 1.5) amt *= 1.0 - smoothstep(0.12, 0.28, f.r - f.g);
-  float tone = kind < 0.5 ? uGrade * 0.45 : 0.0;
+  float tone = kind < 0.5 ? uGrade * 0.28 : 0.0;
   gl_FragColor = vec4(gradeCol(col, amt, tone, vW.xy), f.a);
 }`;
 const FS_BG = `
 uniform sampler2D map; varying vec2 vUv; varying vec3 vN; varying vec3 vW;
 ${GRADE}
-void main(){ vec3 c = texture2D(map, vUv).rgb; gl_FragColor = vec4(gradeCol(c, uGrade, uGrade * 0.4, vW.xy), 1.0); }`;
+void main(){ vec3 c = texture2D(map, vUv).rgb; gl_FragColor = vec4(gradeCol(c, uGrade, uGrade * 0.28, vW.xy), 1.0); }`;
 const VS_HAIR = `
 attribute vec2 photo; varying vec2 vP; varying vec2 vUv; varying vec3 vN; varying vec3 vW;
 void main(){ vUv = uv; vP = photo; vN = normalize(mat3(modelMatrix) * normal);
@@ -227,16 +227,16 @@ varying vec2 vP; varying vec2 vUv; varying vec3 vN; varying vec3 vW;
 ${GRADE}
 void main(){
   // soft-edged strand of the photo's own hair
-  float a = smoothstep(0.0, 0.18, vUv.y) * smoothstep(1.0, 0.82, vUv.y) * (1.0 - smoothstep(0.6, 1.0, vUv.x));
+  float a = smoothstep(0.0, 0.3, vUv.y) * smoothstep(1.0, 0.7, vUv.y) * (1.0 - smoothstep(0.45, 1.0, vUv.x));
   if (a < 0.01) discard;
   vec3 col = texture2D(map, vP).rgb;
   col *= 1.0 + 0.12 * lift * vUv.x;
-  gl_FragColor = vec4(gradeCol(col, uGrade, uGrade * 0.45, vW.xy), a);
+  gl_FragColor = vec4(gradeCol(col, uGrade, uGrade * 0.28, vW.xy), a);
 }`;
 const FS_FRINGE = `
 uniform sampler2D front; varying vec2 vUv; varying vec3 vN; varying vec3 vW;
 ${GRADE}
-void main(){ vec4 c = texture2D(front, vUv); if (c.a < 0.02) discard; gl_FragColor = vec4(gradeCol(c.rgb, uGrade, uGrade * 0.45, vW.xy), c.a); }`;
+void main(){ vec4 c = texture2D(front, vUv); if (c.a < 0.02) discard; gl_FragColor = vec4(gradeCol(c.rgb, uGrade, uGrade * 0.28, vW.xy), c.a); }`;
 const FS_SHADOW = `
 uniform sampler2D front; uniform float strength; varying vec2 vUv; varying vec3 vN; varying vec3 vW;
 uniform float uImpact;
@@ -352,7 +352,7 @@ function frameFromLandmarks(pts) {
   let poly = jaw.map(p => ({ x: p.x, y: p.y }));
   for (let i = 1; i < 24; i++) { const t = i / 24 * Math.PI; poly.push({ x: cx + rx * Math.cos(t), y: cy - ry * Math.sin(t) }); }
   const mx = cx, my = (topY + chinY) / 2;
-  poly = poly.map(p => ({ x: mx + (p.x - mx) * 1.06, y: my + (p.y - my) * 1.04 }));
+  poly = poly.map(p => ({ x: mx + (p.x - mx) * 1.11, y: my + (p.y - my) * 1.05 }));
   const spineX = avg([L[28], L[29], L[30], L[33], L[51], L[57]]).x;
   const core = bbox([...jaw, ...L.slice(17, 27), { x: cx, y: browY - 0.3 * (chinY - browY) }]);
   const fr = finishFrame(o.x, o.y, ang, poly, spineX, core);
@@ -516,7 +516,8 @@ function createBook(face, idx) {
   const halves = [{ side: -1, sx: 0, sw: spP }, { side: 1, sx: spP, sw: Wp - spP }];
 
   const fsz = Hp * 0.048;
-  const pick = n => { const out = []; for (let i = 0; i < n; i++) out.push(POOL[(r() * POOL.length) | 0]); return out; };
+  const bag = POOL.slice().sort(() => r() - 0.5); let bi = 0;
+  const pick = n => { const out = []; for (let i = 0; i < n; i++) out.push(bag[bi++ % bag.length]); return out; };
   const pages = [];
   const group = new THREE.Group();
   let inkInfo = null;
@@ -528,7 +529,7 @@ function createBook(face, idx) {
     const rim = rimOf(m, Math.max(3, ts * 3), 'rgba(110,78,50,0.55)');
     const rimF = rimOf(mf, Math.max(3, ts * 3), 'rgba(110,78,50,0.5)');
     const w = hf.sw, h = Hp;
-    const box = { left: w * 0.1, right: w * 0.94, top: 0, bottom: h };
+    const box = hf.side > 0 ? { left: w * 0.04, right: w * 0.52, top: 0, bottom: h } : { left: w * 0.1, right: w * 0.94, top: 0, bottom: h };
     for (let k = 0; k <= NPAGES; k++) {
       const isCover = k === NPAGES;
       let front, back = mk(w, h); const bx = back.getContext('2d');
@@ -677,7 +678,8 @@ function updateBook(b, t, dt) {
     // curl follows speed: the free edge trails behind the hinge
     p.bend = clamp(p.vel * 0.075, -0.75, 0.75) + 0.12 * clamp(p.theta / 0.8, 0, 1) ; if (!p.isCover) p.bend += 0.32 * clamp(p.theta / 0.6, 0, 1);
     p.wave = clamp(Math.abs(p.vel) * 3.2, 0, 22) * (p.isCover ? 0.5 : 1) + (el > p.delay + 1.2 && opening ? 2.5 * Math.sin(t * 2.3 + p.phase) : 0);
-    p.mesh.visible = p.smesh.visible = p.isCover || p.theta > 0.002 || (opening && el > p.delay - 0.03);
+    const settledFlat = opening && !p.isCover && p.k < NPAGES - 1 && el > p.delay + 1.0 && p.theta < 0.3;
+    p.mesh.visible = p.smesh.visible = !settledFlat && (p.isCover || p.theta > 0.002 || (opening && el > p.delay - 0.03));
     p.mesh.material.uniforms.lift.value = clamp(p.theta / 0.9, 0, 1);
     const casts = p.isCover || p.k === NPAGES - 1;
     p.smesh.visible = p.smesh.visible && casts;
@@ -920,8 +922,8 @@ function drawFx(t, dt) {
           fxx.restore();
         }
         // focus lines, redrawn on twos
-        if (e > IMPACT_AT - 0.02 && e < IMPACT_AT + 0.75) {
-          const a = impact ? 1 : Math.pow(clamp(1 - (e - IMPACT_AT - IMPACT_LEN) / 0.6, 0, 1), 1.5);
+        if (e > IMPACT_AT - 0.02 && e < IMPACT_AT + 0.55) {
+          const a = impact ? 1 : Math.pow(clamp(1 - (e - IMPACT_AT - IMPACT_LEN) / 0.42, 0, 1), 2);
           const r = rng(((t * 12) | 0) + b.idx * 99);
           fxx.save();
           for (let i = 0; i < (impact ? 150 : 64); i++) {
@@ -934,7 +936,7 @@ function drawFx(t, dt) {
         }
       }
       // flash right after the hit
-      const fl = e > IMPACT_AT + IMPACT_LEN ? Math.exp(-(e - IMPACT_AT - IMPACT_LEN) * 30) : 0;
+      const fl = e > IMPACT_AT + IMPACT_LEN ? Math.exp(-(e - IMPACT_AT - IMPACT_LEN) * 45) : 0;
       if (fl > 0.01) { fxx.fillStyle = `rgba(255,246,226,${0.38 * fl})`; fxx.fillRect(0, 0, dispW, dispH); }
       // a small pre-hit pulse
       if (e < 0.1) { fxx.fillStyle = `rgba(255,240,210,${0.25 * (1 - e / 0.1)})`; fxx.fillRect(0, 0, dispW, dispH); }
