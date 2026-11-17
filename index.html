@@ -71,9 +71,6 @@ kbd { font-family: var(--f-body); font-size: 11px; border: 1px solid currentColo
 .samples button { flex: none; padding: 4px 10px 4px 4px; gap: 8px; font-size: 13px; }
 .samples button img { width: 44px; height: 54px; object-fit: cover; border-radius: 4px; display: block; }
 .samples button[aria-pressed="true"] { border-color: var(--ochre); box-shadow: inset 0 0 0 1px var(--ochre); }
-#hint { position: absolute; left: 0; top: 0; font-family: var(--f-hand); font-size: 15px; color: #fff4e6; background: rgba(196,42,20,.88); border: 1px solid #ffb39e; border-radius: 999px; padding: 6px 14px; box-shadow: 0 6px 20px rgba(0,0,0,.4); animation: bob 1.6s ease-in-out infinite; }
-@keyframes bob { 50% { translate: 0 -4px; } }
-.write input.nudge { border-bottom-color: var(--shu); box-shadow: 0 2px 0 -1px var(--shu); }
 .write { display: flex; gap: 8px; flex: 1 1 320px; min-width: 0; max-width: 460px; }
 .write input { flex: 1; min-width: 0; font-family: var(--f-hand); font-size: 17px; color: var(--paper); background: transparent; border: none; border-bottom: 1px solid var(--line); padding: 6px 2px; }
 .write input::placeholder { color: #7d7389; }
@@ -94,7 +91,6 @@ kbd { font-family: var(--f-body); font-size: 11px; border: 1px solid currentColo
       <div id="vig"></div>
       <canvas id="fx"></canvas>
       <div id="sfx"></div>
-      <button id="hint" type="button" hidden>✎ ここに書き込めます</button>
       <div class="drop" id="drop" hidden>ここに写真をドロップ</div>
     </div>
   </div>
@@ -1069,14 +1065,6 @@ stage.addEventListener('pointerup', endDrag); stage.addEventListener('pointercan
 
 /* ---------- writing UI: prompt chip and glowing pen tip ---------- */
 function drawInkUi(t) {
-  const hint = $('#hint'), b = books.find(x => x.state === 'open' || x.state === 'opening');
-  const showHint = !!b && t - b.t0 > 1.6 && !inkLines.length && !inkFocus;
-  if (showHint) {
-    const f = b.f, [x, y] = toDisp(f, f.spineX, f.maxY + (f.maxY - f.minY) * 0.06);
-    hint.hidden = false;
-    hint.style.transform = `translate(${clamp(x - hint.offsetWidth / 2, 6, dispW - hint.offsetWidth - 6)}px,${clamp(y, 6, dispH - 40)}px)`;
-  } else hint.hidden = true;
-  $('#ink').classList.toggle('nudge', showHint);
   for (const bk of books) {
     if (!bk.inkPen || bk.state === 'closing') continue;
     const f = bk.f, [px, py] = bk.inkPen, [x, y] = toDisp(f, f.minX + px / bk.ts, f.minY + py / bk.ts);
@@ -1136,7 +1124,6 @@ $('#writeForm').addEventListener('submit', e => {
 $('#btnHair').addEventListener('click', e => { hairOn = !hairOn; e.currentTarget.setAttribute('aria-pressed', hairOn); e.currentTarget.textContent = hairOn ? '髪をなびかせる オン' : '髪をなびかせる オフ'; if (isOpen()) { closeAll(); setTimeout(() => { if (!isOpen()) openAll(); }, 900); } });
 $('#ink').addEventListener('focus', () => { inkFocus = true; });
 $('#ink').addEventListener('blur', () => { inkFocus = false; });
-$('#hint').addEventListener('click', () => { if (!lastDragMoved) $('#ink').focus(); lastDragMoved = false; });
 $('#btnSound').addEventListener('click', e => { soundOn = !soundOn; e.currentTarget.setAttribute('aria-pressed', soundOn); e.currentTarget.textContent = soundOn ? '音 オン' : '音 オフ'; });
 
 function resetSource() { books.forEach(b => scene.remove(b.group)); books = []; frozen = false; grade = 0; fxState = null; sfxState = null; particles = []; $('#openLabel').textContent = 'ひらく'; }
