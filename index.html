@@ -1,0 +1,1299 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+</head>
+<body>
+<title>顔の書</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=Zen+Kaku+Gothic+New:wght@400;700&family=Zen+Kurenaido&display=swap">
+<style>
+/* Layout: one stage (the photo) with a slim instrument bar beneath, like a viewfinder over a reading desk. Single dark look by design. */
+:root {
+  --ink: #15121b;        /* night ink background */
+  --ink-2: #221d2b;      /* raised panel */
+  --line: #3a3346;       /* hairlines */
+  --paper: #efe5cf;      /* page paper */
+  --paper-dim: #b9ad95;  /* secondary text */
+  --ochre: #e0a94a;      /* accent: gilt page edge */
+  --shu: #d2452f;        /* vermilion ink for writing */
+  --f-display: "Dela Gothic One", "Hiragino Sans", "Yu Gothic", sans-serif;
+  --f-body: "Zen Kaku Gothic New", "Hiragino Sans", "Yu Gothic", system-ui, sans-serif;
+  --f-hand: "Zen Kurenaido", "Hiragino Mincho ProN", "Yu Mincho", serif;
+  color-scheme: dark;
+}
+html, body { height: 100%; }
+[hidden] { display: none !important; }
+body {
+  background: var(--ink); color: var(--paper); font-family: var(--f-body); font-size: 15px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 14px 24px;
+  box-sizing: border-box;
+}
+.app { max-width: 1040px; margin: 0 auto; display: flex; flex-direction: column; gap: 14px; }
+header { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+h1 { font-family: var(--f-display); font-weight: 400; font-size: 30px; margin: 0; letter-spacing: .06em; line-height: 1; }
+h1 small { font-family: var(--f-body); font-size: 13px; letter-spacing: .08em; color: var(--paper-dim); margin-left: 10px; font-weight: 400; }
+.pill { font-size: 12px; letter-spacing: .08em; padding: 5px 11px; border: 1px solid var(--line); border-radius: 999px; color: var(--paper-dim); display: inline-flex; gap: 8px; align-items: center; }
+.pill i { width: 7px; height: 7px; border-radius: 50%; background: var(--paper-dim); display: inline-block; }
+.pill[data-s="ok"] i { background: var(--ochre); box-shadow: 0 0 8px var(--ochre); }
+.pill[data-s="busy"] i { animation: blink 1s infinite; }
+@keyframes blink { 50% { opacity: .2; } }
+
+.stage-wrap { display: flex; justify-content: center; }
+#stage.open { cursor: grab; touch-action: pan-y; }
+#stage.dragging { cursor: grabbing; }
+#stage { position: relative; overflow: hidden; border-radius: 6px; background: #000; box-shadow: 0 0 0 1px var(--line), 0 30px 80px -30px #000; touch-action: manipulation; }
+#stage canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+#vig { position: absolute; inset: 0; pointer-events: none; opacity: 0;
+  background: radial-gradient(ellipse at center, transparent 40%, rgba(10,6,16,.8) 100%); }
+#sfx { position: absolute; left: 0; top: 0; pointer-events: none; font-family: var(--f-display); white-space: nowrap; }
+#sfx span { display: inline-block; color: #fff8ea; -webkit-text-stroke: .09em #1a1020; paint-order: stroke fill;
+  text-shadow: .06em .06em 0 var(--shu), .1em .1em 0 #1a1020; will-change: transform, opacity; }
+.drop { position: absolute; inset: 0; display: grid; place-items: center; background: rgba(21,18,27,.75); font-size: 18px; letter-spacing: .1em; border: 2px dashed var(--ochre); border-radius: 6px; }
+
+.bar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; }
+.group { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; min-width: 0; }
+button, .btn { font: inherit; font-size: 14px; color: var(--paper); background: var(--ink-2); border: 1px solid var(--line); padding: 9px 14px; border-radius: 6px; cursor: pointer; display: inline-flex; align-items: center; gap: 7px; letter-spacing: .04em; position: relative; }
+button:hover, .btn:hover { border-color: var(--paper-dim); }
+button:focus-visible, .btn:focus-within, input:focus-visible { outline: 2px solid var(--ochre); outline-offset: 2px; }
+#btnOpen { font-family: var(--f-display); font-size: 17px; padding: 10px 22px; background: var(--ochre); color: #1a1020; border-color: var(--ochre); letter-spacing: .12em; }
+#btnOpen:hover { filter: brightness(1.08); }
+kbd { font-family: var(--f-body); font-size: 11px; border: 1px solid currentColor; border-radius: 3px; padding: 0 4px; opacity: .7; }
+@media (hover: none) { kbd { display: none; } }
+.btn input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+.samples { display: flex; gap: 8px; align-items: center; overflow-x: auto; padding-bottom: 2px; }
+.samples .lbl { font-size: 12px; letter-spacing: .12em; color: var(--paper-dim); flex: none; }
+.samples button { flex: none; padding: 4px 10px 4px 4px; gap: 8px; font-size: 13px; }
+.samples button img { width: 44px; height: 54px; object-fit: cover; border-radius: 4px; display: block; }
+.samples button[aria-pressed="true"] { border-color: var(--ochre); box-shadow: inset 0 0 0 1px var(--ochre); }
+#hint { position: absolute; left: 0; top: 0; font-family: var(--f-hand); font-size: 15px; color: #fff4e6; background: rgba(196,42,20,.88); border: 1px solid #ffb39e; border-radius: 999px; padding: 6px 14px; box-shadow: 0 6px 20px rgba(0,0,0,.4); animation: bob 1.6s ease-in-out infinite; }
+@keyframes bob { 50% { translate: 0 -4px; } }
+.write input.nudge { border-bottom-color: var(--shu); box-shadow: 0 2px 0 -1px var(--shu); }
+.write { display: flex; gap: 8px; flex: 1 1 320px; min-width: 0; max-width: 460px; }
+.write input { flex: 1; min-width: 0; font-family: var(--f-hand); font-size: 17px; color: var(--paper); background: transparent; border: none; border-bottom: 1px solid var(--line); padding: 6px 2px; }
+.write input::placeholder { color: #7d7389; }
+.write button { color: var(--shu); border-color: color-mix(in srgb, var(--shu) 50%, var(--line)); }
+#msg { font-size: 13px; color: var(--paper-dim); margin: 0; min-height: 1.4em; line-height: 1.6; }
+@media (max-width: 560px) { h1 { font-size: 24px; } h1 small { display: block; margin: 6px 0 0; } }
+</style>
+
+<div class="app">
+  <header>
+    <h1>顔の書<small>顔をみつけて、本のようにひらく</small></h1>
+    <span class="pill" id="pill" data-s="busy"><i></i><span id="pillText">準備中</span></span>
+  </header>
+
+  <div class="stage-wrap">
+    <div id="stage">
+      <canvas id="gl"></canvas>
+      <div id="vig"></div>
+      <canvas id="fx"></canvas>
+      <div id="sfx"></div>
+      <button id="hint" type="button" hidden>✎ ここに書き込めます</button>
+      <div class="drop" id="drop" hidden>ここに写真をドロップ</div>
+    </div>
+  </div>
+
+  <div class="bar">
+    <div class="group">
+      <button id="btnOpen" type="button"><span id="openLabel">ひらく</span> <kbd>Space</kbd></button>
+      <button id="btnCam" type="button">カメラ</button>
+      <input id="snap" type="file" accept="image/*" capture="user" hidden>
+      <label class="btn" for="file">写真を選ぶ<input id="file" type="file" accept="image/*"></label>
+      <button id="btnSound" type="button" aria-pressed="true">音 オン</button>
+      <button id="btnHair" type="button" aria-pressed="true">髪をなびかせる オン</button>
+    </div>
+    <form class="write" id="writeForm">
+      <input id="ink" maxlength="40" placeholder="ページに書き込む（例：今日は早く寝る）" autocomplete="off">
+      <button type="submit">書く</button>
+    </form>
+  </div>
+  <div class="samples" id="samples" role="group" aria-label="見本の顔"><span class="lbl">見本</span></div>
+  <p id="msg"></p>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.13/dist/face-api.js"></script>
+<script>
+(() => {
+const $ = s => document.querySelector(s);
+const stage = $('#stage'), glc = $('#gl'), fx = $('#fx');
+const fxx = fx.getContext('2d');
+const src = document.createElement('canvas'); const srcx = src.getContext('2d');
+const msg = t => { $('#msg').textContent = t || ''; };
+const pill = (t, s) => { $('#pillText').textContent = t; $('#pill').dataset.s = s || ''; };
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const smooth = (a, b, x) => { const t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
+const now = () => performance.now() / 1000;
+const mk = (w, h) => { const c = document.createElement('canvas'); c.width = Math.max(1, Math.round(w)); c.height = Math.max(1, Math.round(h)); return c; };
+function rng(seed) { let a = seed >>> 0; return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+
+let dispW = 0, dispH = 0, sc = 1, dpr = Math.min(window.devicePixelRatio || 1, 2);
+let mode = 'demo', video = null, frozen = false;
+let faces = [], books = [];
+let modelsReady = false, detecting = false, lastDet = 0;
+let grade = 0;
+let fxState = null;
+let particles = [];
+const inkLines = [];
+
+/* ---------- three.js ---------- */
+const renderer = new THREE.WebGLRenderer({ canvas: glc, alpha: false, antialias: true });
+renderer.setClearColor(0x000000, 1);
+renderer.sortObjects = true;
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(40, 1, 1, 20000);
+
+// Shared uniforms: one colour grade for the photo, the face halves and the pages, so nothing looks pasted on.
+const U = {
+  uGrade: { value: 0 }, uImpact: { value: 0 }, uDpr: { value: dpr }, uThresh: { value: 0.4 },
+  uFaces: { value: [0, 1, 2, 3].map(() => new THREE.Vector4(0, 0, 1, 0)) }
+};
+const VS = `
+varying vec2 vUv; varying vec3 vN; varying vec3 vW;
+void main(){ vUv = uv; vN = normalize(mat3(modelMatrix) * normal);
+  vec4 w = modelMatrix * vec4(position, 1.0); vW = w.xyz; gl_Position = projectionMatrix * viewMatrix * w; }`;
+const GRADE = `
+uniform float uGrade; uniform float uImpact; uniform float uDpr; uniform float uThresh; uniform vec4 uFaces[4];
+vec3 gradeCol(vec3 c, float amt, float tone, vec2 wp){
+  float l = dot(c, vec3(0.299, 0.587, 0.114));
+  // keep strongly coloured details (eyes, lips) in colour
+  float mxc = max(c.r, max(c.g, c.b)), mnc = min(c.r, min(c.g, c.b));
+  amt *= 1.0 - 0.65 * smoothstep(0.3, 0.65, (mxc - mnc) / (mxc + 0.001)) * smoothstep(0.08, 0.25, mxc);
+  vec3 sep = vec3(l * 1.08 + 0.02, l * 0.96 + 0.005, l * 0.80);
+  vec3 g = mix(c, mix(vec3(l), sep, 0.6), 0.85 * amt);
+  g = (g - 0.5) * (1.0 + 0.32 * amt) + 0.5;
+  // pull light toward the open book: darken the surroundings
+  float lift = 0.0;
+  for (int i = 0; i < 4; i++) { vec4 f = uFaces[i]; if (f.w > 0.5) { float d = distance(wp, f.xy); lift = max(lift, smoothstep(f.z * 2.6, f.z * 0.9, d)); } }
+  g *= 1.0 - (0.42 - 0.3 * lift) * amt;
+  float lum = dot(g, vec3(0.299, 0.587, 0.114));
+  if (uImpact > 0.5) return vec3(1.0 - smoothstep(uThresh - 0.03, uThresh + 0.03, lum)) * vec3(1.0, 0.97, 0.92);
+  tone *= (1.0 - lift) * smoothstep(0.08, 0.3, lum) * smoothstep(0.92, 0.62, lum);
+  if (tone > 0.001) {
+    // fine screentone on a 45° grid, midtones only
+    float cell = 3.4 * uDpr;
+    vec2 q = mat2(0.7071, -0.7071, 0.7071, 0.7071) * gl_FragCoord.xy;
+    vec2 p = mod(q, cell) - cell * 0.5;
+    float r = cell * 0.6 * sqrt(clamp(1.0 - lum, 0.0, 1.0));
+    float dm = 1.0 - smoothstep(r - 0.6, r + 0.6, length(p));
+    g = mix(g, g * 0.62, dm * tone);
+  }
+  return clamp(g, 0.0, 1.0);
+}`;
+const FS_PAGE = `
+uniform sampler2D front; uniform sampler2D back; uniform float hinge; uniform float lift; uniform float kind; uniform float layer;
+varying vec2 vUv; varying vec3 vN; varying vec3 vW;
+${GRADE}
+void main(){
+  vec4 f = texture2D(front, vUv);
+  if (f.a < 0.01) discard;
+  vec3 V = normalize(cameraPosition - vW);
+  vec3 n = normalize(vN);
+  bool isFront = dot(n, V) >= 0.0;
+  vec3 col = isFront ? f.rgb : texture2D(back, vec2(1.0 - vUv.x, vUv.y)).rgb;
+  vec3 nf = isFront ? n : -n;
+  vec3 L = normalize(vec3(-0.35, 0.5, 1.0));
+  float d = max(dot(nf, L), 0.0) / L.z;
+  float lit = kind > 1.5 ? 1.0 : mix(kind < 0.5 ? 0.62 : 0.45, 1.0, clamp(d, 0.0, 1.12));
+  float h = hinge > 0.5 ? vUv.x : 1.0 - vUv.x;
+  lit *= 1.0 - lift * 0.32 * smoothstep(0.7, 1.0, h);
+  if (kind < 0.5 && isFront) lit *= 1.0 - 0.22 * lift;
+  col *= lit;
+  // warm rim light and a little light through the paper
+  float rim = pow(1.0 - abs(dot(n, V)), 3.0);
+  col += vec3(1.0, 0.78, 0.42) * rim * 0.45 * lift;
+  if (!isFront) col += vec3(0.10, 0.07, 0.03) * lift;
+  // lower pages sit deeper in the book, so they get less light
+  if (kind > 0.5 && kind < 1.5) col *= 0.86 + 0.14 * layer;
+  float amt = kind < 0.5 ? uGrade : uGrade * 0.22;
+  // keep the vermilion ink vivid
+  if (kind > 1.5) amt *= 1.0 - smoothstep(0.12, 0.28, f.r - f.g);
+  float tone = kind < 0.5 ? uGrade * 0.45 : 0.0;
+  gl_FragColor = vec4(gradeCol(col, amt, tone, vW.xy), f.a);
+}`;
+const FS_BG = `
+uniform sampler2D map; varying vec2 vUv; varying vec3 vN; varying vec3 vW;
+${GRADE}
+void main(){ vec3 c = texture2D(map, vUv).rgb; gl_FragColor = vec4(gradeCol(c, uGrade, uGrade * 0.4, vW.xy), 1.0); }`;
+const VS_HAIR = `
+attribute vec2 photo; varying vec2 vP; varying vec2 vUv; varying vec3 vN; varying vec3 vW;
+void main(){ vUv = uv; vP = photo; vN = normalize(mat3(modelMatrix) * normal);
+  vec4 w = modelMatrix * vec4(position, 1.0); vW = w.xyz; gl_Position = projectionMatrix * viewMatrix * w; }`;
+const FS_HAIR = `
+uniform sampler2D map; uniform float lift;
+varying vec2 vP; varying vec2 vUv; varying vec3 vN; varying vec3 vW;
+${GRADE}
+void main(){
+  // soft-edged strand of the photo's own hair
+  float a = smoothstep(0.0, 0.18, vUv.y) * smoothstep(1.0, 0.82, vUv.y) * (1.0 - smoothstep(0.6, 1.0, vUv.x));
+  if (a < 0.01) discard;
+  vec3 col = texture2D(map, vP).rgb;
+  col *= 1.0 + 0.12 * lift * vUv.x;
+  gl_FragColor = vec4(gradeCol(col, uGrade, uGrade * 0.45, vW.xy), a);
+}`;
+const FS_FRINGE = `
+uniform sampler2D front; varying vec2 vUv; varying vec3 vN; varying vec3 vW;
+${GRADE}
+void main(){ vec4 c = texture2D(front, vUv); if (c.a < 0.02) discard; gl_FragColor = vec4(gradeCol(c.rgb, uGrade, uGrade * 0.45, vW.xy), c.a); }`;
+const FS_SHADOW = `
+uniform sampler2D front; uniform float strength; varying vec2 vUv; varying vec3 vN; varying vec3 vW;
+uniform float uImpact;
+void main(){ float a = texture2D(front, vUv).a * strength; if (a < 0.005 || uImpact > 0.5) discard; gl_FragColor = vec4(0.05, 0.02, 0.06, a); }`;
+
+let bgMesh = null, srcTex = null;
+function setSourceTexture() {
+  if (srcTex) srcTex.dispose();
+  srcTex = new THREE.CanvasTexture(src); srcTex.minFilter = THREE.LinearFilter; srcTex.generateMipmaps = false;
+  if (bgMesh) bgMesh.material.uniforms.map.value = srcTex;
+}
+
+/* ---------- text content ---------- */
+const POOL = [
+  '今朝、靴下を左右ちがうまま家を出た', '好きなもの　焼きたてのパンの匂い', '苦手なもの　月曜日の朝',
+  '最近うれしかったこと　信号がぜんぶ青だった', '秘密　じつは猫舌', '夢　海の見える部屋に住むこと',
+  '口ぐせは「まあ、なんとかなる」', '昨夜の夢　空を泳いでいた', '財布の中はレシートだらけ',
+  '子どものころ段ボールで基地を作った', '雨の日の窓が好き', 'ねむい　とてもねむい',
+  '冷蔵庫にプリンを一つ隠している', '初恋は小学三年の春', 'いちばん古い記憶は青い三輪車',
+  '迷ったら右に曲がる', '歌うと音程がずれる', '朝ごはんは食べない派', '最後に泣いた映画を覚えている',
+  'ほんとうは早く寝たい', '電車で寝過ごしたこと三回', 'ポケットに飴が入っている',
+  '人に言えない特技　片眉だけ上がる', '今日の運勢　小吉', '机の引き出しに古い手紙'
+];
+const MOOD = { neutral: 'ふつう', happy: 'たのしい', sad: 'すこしさみしい', angry: 'ちょっと怒ってる', fearful: 'びくびく', disgusted: 'いやそう', surprised: 'おどろいている' };
+const ROT = new Set(['ー', '〜', '…', '「', '」', '（', '）', '—', '-', '→']);
+const SMALL = new Set(['、', '。']);
+const FONTH = '"Zen Kurenaido", "Hiragino Mincho ProN", "Yu Mincho", serif';
+
+// per-column top/bottom of the page silhouette, so writing follows the face outline
+function boundsOf(mask) {
+  const w = mask.width, h = mask.height;
+  const rc = mk(w, h), rcx = rc.getContext('2d', { willReadFrequently: true }); rcx.drawImage(mask, 0, 0);
+  const d = rcx.getImageData(0, 0, w, h).data;
+  const top = new Float32Array(w).fill(h), bot = new Float32Array(w).fill(0);
+  for (let x = 0; x < w; x++) { for (let y = 0; y < h; y += 2) if (d[(y * w + x) * 4 + 3] > 200) { top[x] = y; break; } for (let y = h - 1; y >= 0; y -= 2) if (d[(y * w + x) * 4 + 3] > 200) { bot[x] = y; break; } }
+  return { top, bot, w, flip() { return { top: top.slice().reverse(), bot: bot.slice().reverse(), w }; } };
+}
+function colRange(B, x, fs) {
+  if (!B) return null;
+  let t = 0, b = 1e9; for (let i = Math.floor(x - fs * 0.6); i <= Math.ceil(x + fs * 0.6); i++) { const k = clamp(i, 0, B.w - 1); t = Math.max(t, B.top[k]); b = Math.min(b, B.bot[k]); }
+  return [t + fs * 1.1, b - fs * 1.0];
+}
+// vertical, right-to-left handwriting
+function vText(ctx, lines, box, size, color, seed, reveal, B) {
+  const r = rng(seed); let x = box.right - size * 0.6, n = 0;
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  const range = (fs) => { const cr = colRange(B, x, fs); return cr ? [Math.max(box.top, cr[0]), Math.min(box.bottom, cr[1])] : [box.top, box.bottom]; };
+  let fs0 = size, [y, yb] = range(size);
+  const nextCol = fs => { x -= fs * 1.5; for (let guard = 0; guard < 30 && x >= box.left; guard++) { [y, yb] = range(fs); if (yb - y > fs * 2.5) return; x -= fs * 0.5; } };
+  while (yb - y <= fs0 * 2.5 && x >= box.left) nextCol(fs0);
+  for (const line of lines) {
+    const col = typeof line === 'string' ? { t: line } : line;
+    ctx.fillStyle = col.c || color;
+    const fs = size * (col.s || 1);
+    ctx.font = `${fs}px ${FONTH}`;
+    for (const ch of col.t) {
+      if (reveal != null && n >= reveal) return;
+      if (y > yb - fs * 0.5) nextCol(fs);
+      if (x < box.left) return;
+      if (ch === '　' || ch === ' ') { y += fs * 0.6; n++; continue; }
+      ctx.save();
+      ctx.translate(x + (r() - .5) * fs * 0.12, y + (r() - .5) * fs * 0.08);
+      ctx.rotate((r() - .5) * 0.09);
+      if (ROT.has(ch)) ctx.rotate(Math.PI / 2);
+      if (SMALL.has(ch)) ctx.translate(fs * 0.35, -fs * 0.3);
+      ctx.globalAlpha = 0.8 + r() * 0.2;
+      ctx.fillText(ch, 0, 0); vText.last = [x, y];
+      ctx.restore();
+      y += fs * 1.02; n++;
+    }
+    nextCol(fs);
+  }
+}
+
+function paper(ctx, w, h, seed, tint) {
+  const r = rng(seed);
+  const g = ctx.createLinearGradient(0, 0, w, h);
+  g.addColorStop(0, tint ? '#f4ead4' : '#f1e5cb'); g.addColorStop(1, tint ? '#e8dabd' : '#e4d4b4');
+  ctx.fillStyle = g; ctx.fillRect(0, 0, w, h);
+  for (let i = 0; i < w * h / 90; i++) { ctx.fillStyle = `rgba(${90 + r() * 60},${70 + r() * 40},${40 + r() * 30},${r() * 0.06})`; ctx.fillRect(r() * w, r() * h, 1 + r() * 1.5, 1 + r() * 1.5); }
+  ctx.strokeStyle = 'rgba(120,95,60,0.07)'; ctx.lineWidth = 0.7;
+  for (let i = 0; i < w * h / 1400; i++) { const x = r() * w, y = r() * h, a = r() * 6.28, l = 3 + r() * 9; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + Math.cos(a) * l, y + Math.sin(a) * l); ctx.stroke(); }
+}
+// endpaper: marbled indigo and vermilion, shows on the back of the face halves
+function endpaper(ctx, w, h, seed) {
+  const r = rng(seed);
+  ctx.fillStyle = '#2b2140'; ctx.fillRect(0, 0, w, h);
+  for (let i = 0; i < 26; i++) {
+    const y0 = r() * h, amp = 6 + r() * 26, fq = 0.01 + r() * 0.03, ph = r() * 6;
+    ctx.strokeStyle = ['rgba(210,69,47,0.55)', 'rgba(224,169,74,0.45)', 'rgba(239,229,207,0.25)', 'rgba(20,14,30,0.6)'][i % 4];
+    ctx.lineWidth = 2 + r() * 7; ctx.beginPath();
+    for (let x = 0; x <= w; x += 6) { const y = y0 + Math.sin(x * fq + ph) * amp + Math.sin(x * fq * 2.7 + ph * 2) * amp * 0.3; x ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }
+    ctx.stroke();
+  }
+}
+
+/* ---------- face frames ---------- */
+function avg(pts) { let x = 0, y = 0; for (const p of pts) { x += p.x; y += p.y; } return { x: x / pts.length, y: y / pts.length }; }
+function bbox(pts) { let minX = 1e9, maxX = -1e9, minY = 1e9, maxY = -1e9; for (const p of pts) { minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x); minY = Math.min(minY, p.y); maxY = Math.max(maxY, p.y); } return { minX, maxX, minY, maxY }; }
+function finishFrame(ox, oy, ang, poly, spineX, core) { return { ox, oy, ang, poly, spineX, ...bbox(poly), core: core || bbox(poly) }; }
+function frameFromLandmarks(pts) {
+  const le = avg(pts.slice(36, 42)), re = avg(pts.slice(42, 48));
+  const ang = Math.atan2(re.y - le.y, re.x - le.x);
+  const o = pts[27], c = Math.cos(-ang), s = Math.sin(-ang);
+  const L = pts.map(p => ({ x: (p.x - o.x) * c - (p.y - o.y) * s, y: (p.x - o.x) * s + (p.y - o.y) * c }));
+  const jaw = L.slice(0, 17);
+  const browY = Math.min(...L.slice(17, 27).map(p => p.y));
+  const chinY = L[8].y;
+  const dl = L[30].x - L[0].x, dr = L[16].x - L[30].x, yaw = (dr - dl) / Math.max(1, dr + dl);
+  const topY = browY - (0.55 - 0.25 * Math.min(1, Math.abs(yaw) * 1.6)) * (chinY - browY);
+  const j0 = jaw[0], j16 = jaw[16];
+  const cx = (j0.x + j16.x) / 2, cy = (j0.y + j16.y) / 2, rx = (j16.x - j0.x) / 2, ry = cy - topY;
+  let poly = jaw.map(p => ({ x: p.x, y: p.y }));
+  for (let i = 1; i < 24; i++) { const t = i / 24 * Math.PI; poly.push({ x: cx + rx * Math.cos(t), y: cy - ry * Math.sin(t) }); }
+  const mx = cx, my = (topY + chinY) / 2;
+  poly = poly.map(p => ({ x: mx + (p.x - mx) * 1.06, y: my + (p.y - my) * 1.04 }));
+  const spineX = avg([L[28], L[29], L[30], L[33], L[51], L[57]]).x;
+  const core = bbox([...jaw, ...L.slice(17, 27), { x: cx, y: browY - 0.3 * (chinY - browY) }]);
+  const fr = finishFrame(o.x, o.y, ang, poly, spineX, core);
+  const ell = (q, k) => { const bb = bbox(q), rx2 = Math.max(4, (bb.maxX - bb.minX) / 2 * k); return { x: (bb.minX + bb.maxX) / 2, y: (bb.minY + bb.maxY) / 2, rx: rx2, ry: Math.max(rx2 * 0.55, (bb.maxY - bb.minY) / 2 * k) }; };
+  fr.feats = [ell(L.slice(36, 42), 1.8), ell(L.slice(42, 48), 1.8), ell(L.slice(17, 22), 1.2), ell(L.slice(22, 27), 1.2), ell(L.slice(48, 60), 1.35), ell(L.slice(31, 36), 1.5)];
+  const mid = (a, b) => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
+  fr.skin = [L[29], mid(L[2], L[31]), mid(L[14], L[35]), mid(L[30], L[51])];
+  fr.noseY = L[33].y;
+  return fr;
+}
+function ovalPoly(cx, cy, rx, ryTop, ryBot) {
+  const poly = [];
+  for (let i = 0; i < 64; i++) {
+    const t = i / 64 * Math.PI * 2, sn = Math.sin(t);
+    const taper = sn > 0 ? 1 - 0.22 * sn * sn : 1;
+    poly.push({ x: cx + rx * Math.cos(t) * taper, y: cy + (sn > 0 ? ryBot : ryTop) * sn });
+  }
+  return poly;
+}
+
+/* ---------- demo portrait (original illustration) ---------- */
+const DEMO = { w: 800, h: 960, cx: 400, cy: 470, rx: 148, ryTop: 186, ryBot: 196 };
+function drawDemo() {
+  const { w, h, cx, cy, rx, ryTop, ryBot } = DEMO;
+  src.width = w; src.height = h; const c = srcx;
+  let g = c.createRadialGradient(cx, 380, 40, cx, 420, 700);
+  g.addColorStop(0, '#5b6f8f'); g.addColorStop(.55, '#2c3150'); g.addColorStop(1, '#141325');
+  c.fillStyle = g; c.fillRect(0, 0, w, h);
+  const r = rng(7);
+  for (let i = 0; i < 26; i++) { const x = r() * w, y = r() * h * .7, rr = 8 + r() * 40; const gg = c.createRadialGradient(x, y, 0, x, y, rr); gg.addColorStop(0, `rgba(255,${200 + r() * 40},${150 + r() * 60},${.18 + r() * .18})`); gg.addColorStop(1, 'rgba(255,220,180,0)'); c.fillStyle = gg; c.beginPath(); c.arc(x, y, rr, 0, 7); c.fill(); }
+  c.fillStyle = '#1c1626';
+  c.beginPath(); c.ellipse(cx, cy - 40, rx * 1.38, ryTop * 1.3, 0, Math.PI, 0); c.lineTo(cx + rx * 1.42, cy + 230); c.quadraticCurveTo(cx, cy + 300, cx - rx * 1.42, cy + 230); c.closePath(); c.fill();
+  g = c.createLinearGradient(0, 700, 0, h); g.addColorStop(0, '#3b2f4a'); g.addColorStop(1, '#231b2e');
+  c.fillStyle = g; c.beginPath(); c.moveTo(80, h); c.quadraticCurveTo(110, 760, 300, 720); c.lineTo(500, 720); c.quadraticCurveTo(690, 760, 720, h); c.fill();
+  c.fillStyle = '#e9bfa6'; c.beginPath(); c.moveTo(352, 610); c.lineTo(448, 610); c.lineTo(460, 735); c.quadraticCurveTo(400, 770, 340, 735); c.fill();
+  c.fillStyle = 'rgba(150,80,70,.25)'; c.beginPath(); c.ellipse(400, 640, 60, 26, 0, 0, Math.PI); c.fill();
+  c.fillStyle = '#efe5cf'; c.beginPath(); c.moveTo(330, 728); c.lineTo(400, 800); c.lineTo(470, 728); c.lineTo(455, 722); c.lineTo(400, 775); c.lineTo(345, 722); c.fill();
+  c.fillStyle = '#efc5ad'; c.beginPath(); c.ellipse(cx - rx + 4, cy + 10, 20, 34, -.2, 0, 7); c.fill(); c.beginPath(); c.ellipse(cx + rx - 4, cy + 10, 20, 34, .2, 0, 7); c.fill();
+  const poly = ovalPoly(cx, cy, rx, ryTop, ryBot);
+  c.beginPath(); poly.forEach((p, i) => i ? c.lineTo(p.x, p.y) : c.moveTo(p.x, p.y)); c.closePath();
+  g = c.createRadialGradient(cx - 30, cy - 20, 20, cx, cy + 20, 260); g.addColorStop(0, '#f8dcc9'); g.addColorStop(1, '#e8b89e');
+  c.fillStyle = g; c.fill();
+  for (const sx of [-1, 1]) { const gg = c.createRadialGradient(cx + sx * 88, cy + 70, 0, cx + sx * 88, cy + 70, 46); gg.addColorStop(0, 'rgba(240,120,120,.35)'); gg.addColorStop(1, 'rgba(240,120,120,0)'); c.fillStyle = gg; c.beginPath(); c.arc(cx + sx * 88, cy + 70, 46, 0, 7); c.fill(); }
+  for (const sx of [-1, 1]) {
+    const ex = cx + sx * 66, ey = cy + 10;
+    c.fillStyle = '#fffaf4'; c.beginPath(); c.ellipse(ex, ey, 40, 30, 0, 0, 7); c.fill();
+    const ig = c.createLinearGradient(0, ey - 30, 0, ey + 30); ig.addColorStop(0, '#5a2c1c'); ig.addColorStop(.6, '#c27a2c'); ig.addColorStop(1, '#f2c45a');
+    c.fillStyle = ig; c.beginPath(); c.ellipse(ex + sx * 2, ey + 2, 24, 30, 0, 0, 7); c.fill();
+    c.fillStyle = '#20100c'; c.beginPath(); c.ellipse(ex + sx * 2, ey + 4, 11, 15, 0, 0, 7); c.fill();
+    c.fillStyle = '#fff'; c.beginPath(); c.ellipse(ex - 8, ey - 10, 8, 10, -.4, 0, 7); c.fill(); c.beginPath(); c.arc(ex + 10, ey + 14, 4, 0, 7); c.fill();
+    c.strokeStyle = '#241418'; c.lineWidth = 7; c.lineCap = 'round'; c.beginPath(); c.moveTo(ex - sx * 44, ey + 2); c.quadraticCurveTo(ex, ey - 44, ex + sx * 46, ey - 8); c.stroke();
+    c.lineWidth = 2; c.beginPath(); c.moveTo(ex - 30, ey + 26); c.quadraticCurveTo(ex, ey + 34, ex + 30, ey + 26); c.stroke();
+    c.lineWidth = 5; c.strokeStyle = '#3a2420'; c.beginPath(); c.moveTo(ex - sx * 30, ey - 58); c.quadraticCurveTo(ex, ey - 72, ex + sx * 42, ey - 60); c.stroke();
+  }
+  c.strokeStyle = 'rgba(160,90,70,.6)'; c.lineWidth = 3; c.beginPath(); c.moveTo(cx + 4, cy + 60); c.lineTo(cx - 3, cy + 82); c.stroke();
+  c.strokeStyle = '#8a3c38'; c.lineWidth = 4; c.beginPath(); c.moveTo(cx - 24, cy + 118); c.quadraticCurveTo(cx, cy + 134, cx + 26, cy + 116); c.stroke();
+  c.fillStyle = '#251c31';
+  c.beginPath(); c.moveTo(cx - rx * 1.25, cy + 60); c.quadraticCurveTo(cx - rx * 1.3, cy - ryTop * 1.25, cx, cy - ryTop * 1.2);
+  c.quadraticCurveTo(cx + rx * 1.35, cy - ryTop * 1.2, cx + rx * 1.24, cy + 70);
+  const tips = [[1.05, -0.05], [0.8, -0.32], [0.62, -0.18], [0.38, -0.42], [0.12, -0.3], [-0.12, -0.46], [-0.35, -0.28], [-0.6, -0.4], [-0.82, -0.2], [-1.06, -0.02]];
+  let prev = [cx + rx * 1.24, cy + 70];
+  tips.forEach(([tx, ty], i) => { const x = cx + rx * tx, y = cy + ryTop * ty; const mx = (prev[0] + x) / 2, my = cy - ryTop * (0.72 + (i % 2) * 0.12); c.quadraticCurveTo(mx, my, x, y); prev = [x, y]; });
+  c.closePath(); c.fill();
+  c.strokeStyle = 'rgba(150,130,200,.35)'; c.lineWidth = 3; c.beginPath(); c.arc(cx - 40, cy - 150, 90, 3.6, 4.4); c.stroke();
+  const poly2 = ovalPoly(0, 5, rx * 1.02, ryTop * 1.01, ryBot * 1.01);
+  const f = finishFrame(cx, cy - 5, 0, poly2, 0, { minX: -rx * 0.98, maxX: rx * 0.98, minY: -ryTop * 0.75, maxY: ryBot });
+  f.feats = [{ x: -66, y: 15, rx: 52, ry: 40 }, { x: 66, y: 15, rx: 52, ry: 40 }, { x: -70, y: -52, rx: 50, ry: 22 }, { x: 70, y: -52, rx: 50, ry: 22 }, { x: 0, y: 122, rx: 42, ry: 24 }, { x: 0, y: 75, rx: 16, ry: 22 }];
+  f.skin = [{ x: 0, y: 45 }, { x: -85, y: 75 }, { x: 85, y: 75 }, { x: 0, y: 150 }];
+  f.noseY = 82;
+  return [{ frame: f, score: 1, expr: 'happy', demo: true }];
+}
+
+/* ---------- layout ---------- */
+function layout() {
+  const wrapW = stage.parentElement.clientWidth;
+  const maxH = Math.max(280, window.innerHeight * 0.68);
+  const ar = src.width / src.height;
+  dispW = Math.floor(Math.min(wrapW, maxH * ar)); dispH = Math.floor(dispW / ar);
+  sc = dispW / src.width;
+  stage.style.width = dispW + 'px'; stage.style.height = dispH + 'px';
+  fx.width = dispW * dpr; fx.height = dispH * dpr;
+  renderer.setPixelRatio(dpr); renderer.setSize(dispW, dispH, false); U.uDpr.value = dpr;
+  camera.aspect = dispW / dispH;
+  const z = dispH / 2 / Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
+  camera.position.set(dispW / 2, -dispH / 2, z); camera.lookAt(dispW / 2, -dispH / 2, 0);
+  camera.near = z / 20; camera.far = z * 4; camera.updateProjectionMatrix();
+  if (bgMesh) { scene.remove(bgMesh); bgMesh.geometry.dispose(); }
+  if (!srcTex || srcTex.image !== src || srcTex.__w !== src.width || srcTex.__h !== src.height) { setSourceTexture(); srcTex.__w = src.width; srcTex.__h = src.height; }
+  if (!bgMesh) bgMesh = new THREE.Mesh(undefined, new THREE.ShaderMaterial({ uniforms: { ...U, map: { value: srcTex } }, vertexShader: VS, fragmentShader: FS_BG, depthWrite: false, depthTest: false }));
+  bgMesh.geometry = new THREE.PlaneGeometry(dispW, dispH);
+  bgMesh.position.set(dispW / 2, -dispH / 2, 0); bgMesh.renderOrder = -10;
+  bgMesh.material.uniforms.map.value = srcTex; srcTex.needsUpdate = true;
+  scene.add(bgMesh);
+  for (const b of books) placeBook(b);
+}
+window.addEventListener('resize', layout);
+
+/* ---------- book construction ---------- */
+const COLS = 30, ROWS = 8, NPAGES = 5;
+function polyPath(ctx, poly, f, ts, scale = 1) {
+  const mx = (f.minX + f.maxX) / 2, my = (f.minY + f.maxY) / 2;
+  ctx.beginPath();
+  poly.forEach((p, i) => { const x = (mx + (p.x - mx) * scale - f.minX) * ts, y = (my + (p.y - my) * scale - f.minY) * ts; i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); });
+  ctx.closePath();
+}
+function crop(c, sx, sw, flip) { const o = mk(sw, c.height), x = o.getContext('2d'); if (flip) { x.translate(sw, 0); x.scale(-1, 1); } x.drawImage(c, sx, 0, sw, c.height, 0, 0, sw, c.height); return o; }
+function maskWith(c, m) { const x = c.getContext('2d'); x.save(); x.globalCompositeOperation = 'destination-in'; x.drawImage(m, 0, 0); x.restore(); return c; }
+function rimOf(m, blur, color) { const o = mk(m.width, m.height), x = o.getContext('2d'); x.fillStyle = color; x.fillRect(0, 0, o.width, o.height); x.globalCompositeOperation = 'destination-out'; x.filter = `blur(${blur}px)`; const k = blur * 1.2; x.drawImage(m, k, k, m.width - 2 * k, m.height - 2 * k); return o; }
+function atop(c, o) { const x = c.getContext('2d'); x.save(); x.globalCompositeOperation = 'source-atop'; x.drawImage(o, 0, 0); x.restore(); return c; }
+function blurred(m, px) { const o = mk(m.width, m.height), x = o.getContext('2d'); x.filter = `blur(${px}px)`; const k = px * 0.6; x.drawImage(m, k, k, m.width - 2 * k, m.height - 2 * k); return o; }
+function tex(c) { const t = new THREE.CanvasTexture(c); t.minFilter = THREE.LinearFilter; t.generateMipmaps = false; t.anisotropy = 4; return t; }
+
+function pageGeom(side) {
+  const n = (COLS + 1) * (ROWS + 1);
+  const g = new THREE.BufferGeometry();
+  const uv = new Float32Array(n * 2), idx = [];
+  for (let j = 0; j <= ROWS; j++) for (let i = 0; i <= COLS; i++) { const k = j * (COLS + 1) + i, u = i / COLS; uv[k * 2] = side > 0 ? 1 - u : u; uv[k * 2 + 1] = 1 - j / ROWS; }
+  for (let j = 0; j < ROWS; j++) for (let i = 0; i < COLS; i++) { const a = j * (COLS + 1) + i, b = a + 1, c = a + COLS + 1, d = c + 1; idx.push(a, c, b, b, c, d); }
+  g.setIndex(idx);
+  g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(n * 3), 3));
+  g.setAttribute('normal', new THREE.BufferAttribute(new Float32Array(n * 3), 3));
+  g.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+  return g;
+}
+const XS = new Float32Array(COLS + 1), ZS = new Float32Array(COLS + 1), PH = new Float32Array(COLS + 1);
+function bendPage(p, f) {
+  const { side, hx, zOff } = p; const L = p.L * p.sx; const th = p.theta, bend = p.bend, wave = p.wave;
+  const du = L / COLS; XS[0] = hx; ZS[0] = 0;
+  for (let i = 0; i <= COLS; i++) PH[i] = th - bend * Math.pow(i / COLS, 1.5);
+  for (let i = 0; i < COLS; i++) { const ph = (PH[i] + PH[i + 1]) / 2; XS[i + 1] = XS[i] + (side > 0 ? -Math.cos(ph) : Math.cos(ph)) * du; ZS[i + 1] = ZS[i] + Math.sin(ph) * du; }
+  const pos = p.geom.attributes.position.array, nor = p.geom.attributes.normal.array, sp = p.sgeom.attributes.position.array;
+  const H = f.maxY - f.minY, cyL = (f.minY + f.maxY) / 2;
+  const shx = 0.38, shy = -0.52; // shadow offset per unit height (light from upper left, toward viewer)
+  for (let j = 0; j <= ROWS; j++) {
+    const v = j / ROWS, y = -(cyL + (f.minY + v * H - cyL) * p.sy), sv = Math.sin(Math.PI * v);
+    for (let i = 0; i <= COLS; i++) {
+      const k = (j * (COLS + 1) + i) * 3, t = i / COLS;
+      const z = ZS[i] + zOff + wave * sv * t * t;
+      pos[k] = XS[i]; pos[k + 1] = y; pos[k + 2] = z;
+      const ph = PH[i]; nor[k] = side > 0 ? Math.sin(ph) : -Math.sin(ph); nor[k + 1] = 0; nor[k + 2] = Math.cos(ph);
+      const hz = Math.max(0, z - zOff);
+      sp[k] = XS[i] + hz * shx; sp[k + 1] = y + hz * shy; sp[k + 2] = 0.2;
+    }
+  }
+  p.geom.attributes.position.needsUpdate = true; p.geom.attributes.normal.needsUpdate = true;
+  p.sgeom.attributes.position.needsUpdate = true;
+}
+
+function createBook(face, idx) {
+  const f = face.frame, W = f.maxX - f.minX, H = f.maxY - f.minY;
+  const ts = clamp(640 / Math.max(W, H), 0.6, 2.4);
+  const Wp = Math.round(W * ts), Hp = Math.round(H * ts), spP = clamp(Math.round((f.spineX - f.minX) * ts), 8, Wp - 8);
+  const seed = (Math.random() * 1e9) | 0, r = rng(seed);
+
+  const faceC = mk(Wp, Hp), fc = faceC.getContext('2d');
+  fc.scale(ts, ts); fc.translate(-f.minX, -f.minY); fc.rotate(-f.ang); fc.translate(-f.ox, -f.oy); fc.drawImage(src, 0, 0);
+  const raw = mk(Wp, Hp), rx = raw.getContext('2d'); rx.fillStyle = '#000'; polyPath(rx, f.poly, f, ts); rx.fill();
+  const maskC = mk(Wp, Hp), mx = maskC.getContext('2d'); mx.filter = `blur(${Math.max(1, ts * 1.2)}px)`; mx.drawImage(raw, 0, 0);
+  let coverSrc = faceC, fringeC = null;
+  if (hairOn && f.skin) { const hs = separateHair(f, faceC, raw, ts); if (hs) { coverSrc = hs.cover; fringeC = hs.hair; } }
+  const halves = [{ side: -1, sx: 0, sw: spP }, { side: 1, sx: spP, sw: Wp - spP }];
+
+  const fsz = Hp * 0.048;
+  const pick = n => { const out = []; for (let i = 0; i < n; i++) out.push(POOL[(r() * POOL.length) | 0]); return out; };
+  const pages = [];
+  const group = new THREE.Group();
+  let inkInfo = null;
+  const recNo = String(((seed % 9000) + 1000)).replace(/\d/g, d => '〇一二三四五六七八九'[d]);
+  for (const hf of halves) {
+    const m = crop(maskC, hf.sx, hf.sw), mf = crop(maskC, hf.sx, hf.sw, true);
+    const B = boundsOf(crop(raw, hf.sx, hf.sw)), Bf = B.flip();
+    const soft = blurred(m, Math.max(6, ts * 9));
+    const rim = rimOf(m, Math.max(3, ts * 3), 'rgba(110,78,50,0.55)');
+    const rimF = rimOf(mf, Math.max(3, ts * 3), 'rgba(110,78,50,0.5)');
+    const w = hf.sw, h = Hp;
+    const box = { left: w * 0.1, right: w * 0.94, top: 0, bottom: h };
+    for (let k = 0; k <= NPAGES; k++) {
+      const isCover = k === NPAGES;
+      let front, back = mk(w, h); const bx = back.getContext('2d');
+      if (isCover) {
+        front = crop(coverSrc, hf.sx, hf.sw); maskWith(front, m);
+        // a thin paper edge right at the cut
+        const e = mk(w, h), ex = e.getContext('2d');
+        const sx = hf.side < 0 ? w : 0, gr = ex.createLinearGradient(sx, 0, sx + (hf.side < 0 ? -1 : 1) * Math.max(2.5, ts * 2.2), 0);
+        gr.addColorStop(0, 'rgba(252,244,226,0.95)'); gr.addColorStop(1, 'rgba(252,244,226,0)');
+        ex.fillStyle = gr; ex.fillRect(0, 0, w, h); atop(front, e);
+        endpaper(bx, w, h, seed + hf.side * 5);
+      } else {
+        front = mk(w, h); const x = front.getContext('2d'); paper(x, w, h, seed + k * 31 + hf.side, k % 2);
+        const ln = hf.side > 0 && k === NPAGES - 1 ? [{ t: `記録　第${recNo}号`, s: 1.15, c: '#2a1a1e' }, { t: `いまの気分　${MOOD[face.expr] || 'ふつう'}`, c: '#6a2a1a' }, ...pick(3)] : pick(3), fz = fsz * (0.9 + r() * 0.2);
+        vText(x, ln, box, fz, 'rgba(40,28,30,0.85)', seed + k * 7 + hf.side * 3, null, B);
+        if (hf.side < 0 && k === NPAGES - 1) inkInfo = { w, h, m, rim, B, seed: seed + k * 31 + hf.side, lines: ln, fsz: fsz * 1.05, canvas: front };
+        maskWith(front, m); atop(front, rim);
+        paper(bx, w, h, seed + k * 17 + 5 + hf.side, (k + 1) % 2);
+        vText(bx, pick(3), box, fsz * (0.9 + r() * 0.2), 'rgba(40,28,30,0.85)', seed + k * 13 + hf.side, null, Bf);
+      }
+      maskWith(back, mf); atop(back, rimF);
+      const geom = pageGeom(hf.side), sgeom = new THREE.BufferGeometry();
+      sgeom.setIndex(geom.getIndex()); sgeom.setAttribute('uv', geom.attributes.uv);
+      sgeom.setAttribute('position', new THREE.BufferAttribute(new Float32Array(geom.attributes.position.array.length), 3));
+      sgeom.setAttribute('normal', geom.attributes.normal);
+      const mat = new THREE.ShaderMaterial({ uniforms: { ...U, front: { value: tex(front) }, back: { value: tex(back) }, hinge: { value: hf.side > 0 ? 1 : 0 }, lift: { value: 0 }, kind: { value: isCover ? 0 : 1 }, layer: { value: k / NPAGES } }, vertexShader: VS, fragmentShader: FS_PAGE, transparent: true, side: THREE.DoubleSide });
+      const mesh = new THREE.Mesh(geom, mat); mesh.frustumCulled = false; mesh.renderOrder = 3 + k; mesh.visible = isCover;
+      const smat = new THREE.ShaderMaterial({ uniforms: { uImpact: U.uImpact, front: { value: tex(soft) }, strength: { value: 0 } }, vertexShader: VS, fragmentShader: FS_SHADOW, transparent: true, depthWrite: false, depthTest: false });
+      const smesh = new THREE.Mesh(sgeom, smat); smesh.frustumCulled = false; smesh.renderOrder = 2;
+      group.add(smesh); group.add(mesh);
+      const L = hf.side > 0 ? f.maxX - f.spineX : f.spineX - f.minX;
+      // pages fan inside the open face; the face halves stand open like doors so the face stays readable
+      const p = { mesh, geom, smesh, sgeom, side: hf.side, k, isCover, L, hx: hf.side > 0 ? f.maxX : f.minX, zOff: (k + 1) * 0.8,
+        sx: isCover ? 1 : 1 - (NPAGES - k) * 0.012 + (r() - .5) * 0.02, sy: isCover ? 1 : 1 - (NPAGES - k) * 0.008 + (r() - .5) * 0.02,
+        target: THREE.MathUtils.degToRad(isCover ? 63 + (r() - .5) * 3 : 10 + k * 11 + (r() - .5) * 3),
+        delay: isCover ? 0.26 : 0.31 + [0, 0.04, 0.075, 0.105, 0.13][NPAGES - 1 - k] + (hf.side > 0 ? 0.012 : 0),
+        K: isCover ? 150 : 95 + r() * 70, zeta: isCover ? 0.58 : 0.34 + r() * 0.14,
+        theta: 0, vel: 0, bend: 0, wave: 0, phase: r() * 6.28, launched: false };
+      if (inkInfo && !inkInfo.p && hf.side < 0 && k === NPAGES - 1) { inkInfo.p = p; inkInfo.tex = mat.uniforms.front.value; }
+      bendPage(p, f); pages.push(p);
+    }
+  }
+  const baseC = mk(Wp, Hp);
+  const baseMat = new THREE.ShaderMaterial({ uniforms: { ...U, front: { value: tex(baseC) }, back: { value: null }, hinge: { value: 0 }, lift: { value: 0 }, kind: { value: 2 }, layer: { value: 1 } }, vertexShader: VS, fragmentShader: FS_PAGE, transparent: true, depthWrite: false });
+  baseMat.uniforms.back.value = baseMat.uniforms.front.value;
+  const base = new THREE.Mesh(new THREE.PlaneGeometry(W, H), baseMat);
+  base.position.set((f.minX + f.maxX) / 2, -(f.minY + f.maxY) / 2, 0.1); base.renderOrder = 1; base.visible = false;
+  group.add(base);
+  // warm light from the gutter
+  const gc = mk(128, 256), gx = gc.getContext('2d'), gg = gx.createRadialGradient(64, 128, 0, 64, 128, 64);
+  gg.addColorStop(0, 'rgba(255,214,140,0.9)'); gg.addColorStop(0.4, 'rgba(255,170,80,0.35)'); gg.addColorStop(1, 'rgba(255,150,60,0)');
+  gx.setTransform(1, 0, 0, 2, 0, 0); gx.fillStyle = gg; gx.fillRect(0, 0, 128, 128);
+  const glow = new THREE.Mesh(new THREE.PlaneGeometry(W * 0.55, H * 0.8), new THREE.MeshBasicMaterial({ map: tex(gc), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, opacity: 0 }));
+  glow.position.set(f.spineX, -(f.minY + f.maxY) / 2, 0.5); glow.renderOrder = 2.5; group.add(glow);
+  const book = { face, f, group, pages, base, baseC, raw, Bfull: boundsOf(raw), ts, spP, seed, glow, lines: pick(9), state: 'opening', t0: now(), inkT: 0, inkShown: -1, idx, inkPage: inkInfo, inkPen: null };
+  renderBase(book, 0); renderInkPage(book, 0);
+  if (hairOn) createHair(book);
+  if (fringeC) createFringe(book, fringeC);
+  scene.add(group); placeBook(book);
+  return book;
+}
+function placeBook(b) { const f = b.f; b.group.position.set(f.ox * sc, -f.oy * sc, 0); b.group.rotation.z = -f.ang; b.group.scale.set(sc, sc, sc); }
+
+const inkTotal = () => inkLines.join('').length;
+let inkFocus = false;
+const inkPose = () => inkLines.length > 0 || inkFocus;
+// the top left page carries the reader's writing; it lies flat so the vermilion is readable
+function renderInkPage(b, reveal) {
+  const I = b.inkPage; if (!I) return;
+  const c = I.canvas, x = c.getContext('2d');
+  x.save(); x.clearRect(0, 0, I.w, I.h); paper(x, I.w, I.h, I.seed, 0);
+  const box = { left: I.w * 0.08, right: I.w * 0.95, top: 0, bottom: I.h };
+  vText.last = null;
+  if (inkLines.length) {
+    const lines = [...inkLines.map(t => ({ t, c: '#c42a14', s: 1.45 })), ...I.lines.map(t => ({ t, c: 'rgba(40,28,30,0.4)' }))];
+    vText(x, lines, box, I.fsz, 'rgba(40,28,30,0.85)', I.seed, reveal >= inkTotal() ? null : reveal, I.B);
+  } else vText(x, I.lines, box, I.fsz, 'rgba(40,28,30,0.85)', I.seed, null, I.B);
+  x.restore();
+  maskWith(c, I.m); atop(c, I.rim); I.tex.needsUpdate = true;
+  b.inkPen = vText.last && reveal < inkTotal() ? [...vText.last] : null;
+}
+function renderBase(b, reveal) {
+  const c = b.baseC, x = c.getContext('2d'), w = c.width, h = c.height, sp = b.spP, f = b.f, ts = b.ts;
+  x.clearRect(0, 0, w, h); x.save();
+  paper(x, w, h, b.seed + 99, 1);
+  const fsz = h * 0.048;
+  const mood = MOOD[b.face.expr] || 'ふつう';
+  const no = String(((b.seed % 9000) + 1000)).replace(/\d/g, d => '〇一二三四五六七八九'[d]);
+  vText(x, [{ t: `記録　第${no}号`, s: 1.12, c: '#2a1a1e' }, { t: `いまの気分　${mood}`, c: '#5a3a2a' }, ...b.lines.slice(0, 4)],
+    { left: sp + (w - sp) * 0.08, right: w - (w - sp) * 0.06, top: 0, bottom: h }, fsz, 'rgba(38,26,28,0.9)', b.seed + 1, null, b.Bfull);
+  const lbox = { left: sp * 0.06, right: sp * 0.8, top: 0, bottom: h };
+  vText(x, b.lines.slice(4, 7), lbox, fsz, 'rgba(38,26,28,0.9)', b.seed + 2, null, b.Bfull);
+  // gutter shadow
+  const gw = w * 0.05, g = x.createLinearGradient(sp - gw, 0, sp + gw, 0);
+  g.addColorStop(0, 'rgba(60,35,20,0)'); g.addColorStop(0.46, 'rgba(60,35,20,0.34)'); g.addColorStop(0.5, 'rgba(40,22,12,0.6)'); g.addColorStop(0.54, 'rgba(60,35,20,0.34)'); g.addColorStop(1, 'rgba(60,35,20,0)');
+  x.fillStyle = g; x.fillRect(sp - gw, 0, gw * 2, h);
+  // light falloff toward the rim, and stacked page edges
+  const rg = x.createRadialGradient(sp, h * 0.48, h * 0.15, sp, h * 0.5, h * 0.62);
+  rg.addColorStop(0, 'rgba(255,240,210,0)'); rg.addColorStop(1, 'rgba(70,40,25,0.45)');
+  x.fillStyle = rg; x.fillRect(0, 0, w, h);
+  x.strokeStyle = 'rgba(150,118,80,0.5)'; x.lineWidth = 1;
+  for (let i = 1; i <= 6; i++) { polyPath(x, f.poly, f, ts, 1 - i * 0.01); x.stroke(); }
+  x.save(); polyPath(x, f.poly, f, ts); x.clip(); x.filter = `blur(${ts * 7}px)`; x.strokeStyle = 'rgba(45,25,18,0.65)'; x.lineWidth = ts * 18; polyPath(x, f.poly, f, ts); x.stroke(); x.restore();
+  x.restore();
+  maskWith(c, b.raw);
+  b.base.material.uniforms.front.value.needsUpdate = true;
+}
+
+/* ---------- motion ---------- */
+const v3 = new THREE.Vector3();
+function tipScreen(b, p) {
+  const a = p.geom.attributes.position.array, k = ((ROWS >> 1) * (COLS + 1) + COLS) * 3;
+  v3.set(a[k], a[k + 1], a[k + 2]); b.group.localToWorld(v3); v3.project(camera);
+  return [(v3.x + 1) / 2 * dispW, (1 - v3.y) / 2 * dispH];
+}
+function updateBook(b, t, dt) {
+  const el = t - b.t0; let maxTh = 0, settled = true;
+  const opening = b.state !== 'closing';
+  for (const p of b.pages) {
+    let tgt;
+    if (opening) {
+      if (el < p.delay - 0.14) tgt = 0;
+      else if (el < p.delay) tgt = 0;
+      else {
+        let target = p.target;
+        if (!p.isCover && el > p.delay + 0.8) target = 0.035 + 0.03 * p.k;
+        if (inkPose() && p.side < 0 && !p.isCover) target = p.k === NPAGES - 1 ? 0.15 : 0.022 * (p.k + 1);
+        // dragging spreads that side further, up to lying almost flat outward
+        const dd = p.side < 0 ? dragOpen.L : dragOpen.R;
+        if (dd > 0) { const maxT = p.isCover ? 2.95 : 1.75 + p.k * 0.24; target += (maxT - target) * dd; }
+        p.eff = target;
+        tgt = target + (el > p.delay + 1.2 ? (p.isCover ? 0.015 : target < 0.2 ? 0.01 : 0.045) * Math.sin(t * 1.7 + p.phase) : 0);
+      }
+      if (el >= p.delay && !p.launched) { p.launched = true; p.vel += p.isCover ? 5.5 : 5 + Math.random() * 3; if (!p.isCover) emitFromTip(b, p); }
+    } else {
+      tgt = el < (p.isCover ? 0.16 : 0.02 * (NPAGES - p.k)) ? p.theta : 0;
+    }
+    const K = opening ? p.K : 120, zeta = opening ? p.zeta : 0.9;
+    const C = 2 * zeta * Math.sqrt(K);
+    const steps = Math.max(1, Math.ceil(dt / (1 / 240))), h = dt / steps;
+    for (let s = 0; s < steps; s++) {
+      p.vel += (K * (tgt - p.theta) - C * p.vel) * h; p.theta += p.vel * h;
+      if (opening && p.isCover && p.vel > 0 && p.theta > (p.eff ?? p.target) + 0.1) p.vel *= 0.6;
+      if (!opening && p.theta < 0) { p.theta = 0; p.vel = -p.vel * 0.22; }
+    }
+    // curl follows speed: the free edge trails behind the hinge
+    p.bend = clamp(p.vel * 0.075, -0.75, 0.75) + 0.12 * clamp(p.theta / 0.8, 0, 1) ; if (!p.isCover) p.bend += 0.32 * clamp(p.theta / 0.6, 0, 1);
+    p.wave = clamp(Math.abs(p.vel) * 3.2, 0, 22) * (p.isCover ? 0.5 : 1) + (el > p.delay + 1.2 && opening ? 2.5 * Math.sin(t * 2.3 + p.phase) : 0);
+    p.mesh.visible = p.smesh.visible = p.isCover || p.theta > 0.002 || (opening && el > p.delay - 0.03);
+    p.mesh.material.uniforms.lift.value = clamp(p.theta / 0.9, 0, 1);
+    const casts = p.isCover || p.k === NPAGES - 1;
+    p.smesh.visible = p.smesh.visible && casts;
+    p.smesh.material.uniforms.strength.value = (casts ? 0.34 : 0) * clamp(p.theta / 0.25, 0, 1);
+    maxTh = Math.max(maxTh, p.theta);
+    if (Math.abs(p.theta) > 0.004 || Math.abs(p.vel) > 0.05) settled = false;
+    bendPage(p, b.f);
+  }
+  b.base.visible = maxTh > 0.004 || (opening && el > 0.2);
+  b.glow.material.opacity = opening ? smooth(0.3, 0.9, el) * (0.5 + 0.08 * Math.sin(t * 3.1)) : Math.max(0, b.glow.material.opacity - dt * 2.5);
+  if (opening && el > 2) b.state = 'open';
+  if (!opening && el > 0.4 && settled) b.state = 'closed';
+  // vermilion handwriting, a dozen characters a second
+  const total = inkTotal();
+  if (opening && el > 1.0 && b.inkShown < total) {
+    b.inkT += dt; const n = Math.min(total, Math.floor(b.inkT * 14));
+    if (n !== b.inkShown) { b.inkShown = n; renderInkPage(b, n); }
+  }
+  if (b.hair) updateHair(b, t, dt, el, opening);
+  if (b.fringe) updateFringe(b, t, dt, el, opening);
+}
+
+/* ---------- hair that floats and sways as hair (option) ---------- */
+let hairOn = true;
+const HAIR_N = 22, HC = 14, HR = 3;
+function createHair(b) {
+  const f = b.f, r = Math.random;
+  const cx = f.spineX, cy = (f.minY + f.maxY) / 2 + (f.maxY - f.minY) * 0.04;
+  const rx = (f.maxX - f.minX) / 2, ryT = cy - f.minY, ryB = f.maxY - cy;
+  const rIn = a => { const ry = Math.sin(a) > 0 ? ryB : ryT; return 0.95 / Math.sqrt(Math.cos(a) ** 2 / rx ** 2 + Math.sin(a) ** 2 / ry ** 2); };
+  const a0 = -Math.PI - 0.55, a1 = 0.55, da = (a1 - a0) / HAIR_N, cs = Math.cos(f.ang), sn = Math.sin(f.ang);
+  const strands = [];
+  for (let i = 0; i < HAIR_N; i++) {
+    const s0 = a0 + (i - 0.35) * da, s1 = a0 + (i + 1.35) * da, ext = 0.75 + r() * 0.4;
+    const n = (HC + 1) * (HR + 1), uv = new Float32Array(n * 2), ph = new Float32Array(n * 2), idx = [];
+    for (let j = 0; j <= HR; j++) for (let k = 0; k <= HC; k++) {
+      const id = j * (HC + 1) + k, u = k / HC, v = j / HR, ang = s0 + (s1 - s0) * v, rr = rIn(ang) * (1 + u * ext);
+      const lx = cx + Math.cos(ang) * rr, ly = cy + Math.sin(ang) * rr, X = f.ox + cs * lx - sn * ly, Y = f.oy + sn * lx + cs * ly;
+      uv[id * 2] = u; uv[id * 2 + 1] = v; ph[id * 2] = X / src.width; ph[id * 2 + 1] = 1 - Y / src.height;
+    }
+    for (let j = 0; j < HR; j++) for (let k = 0; k < HC; k++) { const a = j * (HC + 1) + k, b2 = a + 1, c = a + HC + 1, d = c + 1; idx.push(a, c, b2, b2, c, d); }
+    const g = new THREE.BufferGeometry(); g.setIndex(idx);
+    g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(n * 3), 3));
+    const nor = new Float32Array(n * 3); for (let q = 2; q < nor.length; q += 3) nor[q] = 1;
+    g.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
+    g.setAttribute('uv', new THREE.BufferAttribute(uv, 2)); g.setAttribute('photo', new THREE.BufferAttribute(ph, 2));
+    const mat = new THREE.ShaderMaterial({ uniforms: { ...U, map: { value: srcTex }, lift: { value: 0 } }, vertexShader: VS_HAIR, fragmentShader: FS_HAIR, transparent: true, depthWrite: false, side: THREE.DoubleSide });
+    const mesh = new THREE.Mesh(g, mat); mesh.frustumCulled = false; mesh.renderOrder = 0.5;
+    b.group.add(mesh);
+    const mid = (s0 + s1) / 2;
+    strands.push({ mesh, geom: g, s0, s1, ext, side: Math.cos(mid) >= 0 ? 1 : -1, sway: 0, swayV: 0, puff: 0, puffV: 0,
+      delay: IMPACT_AT + 0.02 + Math.abs(Math.sin(mid)) * 0.08 + r() * 0.05, K: 30 + r() * 25, phase: r() * 6.28, freq: 1.4 + r() * 0.9, launched: false });
+  }
+  b.hair = { strands, cx, cy, rIn };
+  for (const st of strands) bendHair(b, st, 0);
+}
+function bendHair(b, st, t) {
+  const { cx, cy, rIn } = b.hair, pos = st.geom.attributes.position.array;
+  for (let j = 0; j <= HR; j++) {
+    const v = j / HR, ang0 = st.s0 + (st.s1 - st.s0) * v, rin = rIn(ang0);
+    for (let k = 0; k <= HC; k++) {
+      const u = k / HC, w = Math.pow(u, 1.6);
+      // the root stays put; the ends lift outward and sweep sideways, with a ripple running down the strand
+      const ripple = 0.05 * st.puff * Math.sin(u * 7 - t * 7 + st.phase) * u;
+      const ang = ang0 + st.sway * w + ripple;
+      const rr = rin * (1 + u * st.ext * (1 + 0.22 * st.puff * w));
+      const id = (j * (HC + 1) + k) * 3;
+      pos[id] = cx + Math.cos(ang) * rr; pos[id + 1] = -(cy + Math.sin(ang) * rr); pos[id + 2] = 0.2 + 18 * st.puff * w;
+    }
+  }
+  st.geom.attributes.position.needsUpdate = true;
+}
+function updateHair(b, t, dt, el, opening) {
+  for (const st of b.hair.strands) {
+    let swayT = 0, puffT = 0;
+    if (opening && el >= st.delay) {
+      // floating in the rising draft from the open book, swaying on two slow winds
+      puffT = 0.55 + 0.12 * Math.sin(t * 0.9 + st.phase);
+      swayT = st.side * 0.05 + 0.11 * Math.sin(t * st.freq + st.phase) + 0.05 * Math.sin(t * 3.1 + st.phase * 1.7);
+      if (!st.launched) { st.launched = true; st.puffV += 6 + Math.random() * 3; st.swayV += st.side * (1.5 + Math.random()); }
+    }
+    const K = st.K, C = 2 * (opening ? 0.28 : 0.6) * Math.sqrt(K);
+    const steps = Math.max(1, Math.ceil(dt / (1 / 240))), h = dt / steps;
+    for (let s2 = 0; s2 < steps; s2++) {
+      st.puffV += (K * (puffT - st.puff) - C * st.puffV) * h; st.puff += st.puffV * h;
+      st.swayV += (K * (swayT - st.sway) - C * st.swayV) * h; st.sway += st.swayV * h;
+    }
+    st.mesh.material.uniforms.lift.value = clamp(st.puff, 0, 1);
+    bendHair(b, st, t);
+  }
+}
+
+/* ---------- hair lying over the face: split from the face by colour, then moved as its own layer ---------- */
+function separateHair(f, faceC, raw, ts) {
+  const w = faceC.width, h = faceC.height;
+  const rc = mk(w, h), rcx = rc.getContext('2d', { willReadFrequently: true }); rcx.drawImage(faceC, 0, 0);
+  const d = rcx.getImageData(0, 0, w, h).data;
+  const mc = mk(w, h), mcx = mc.getContext('2d', { willReadFrequently: true }); mcx.drawImage(raw, 0, 0);
+  const md = mcx.getImageData(0, 0, w, h).data;
+  const T = (lx, ly) => [(lx - f.minX) * ts, (ly - f.minY) * ts];
+  let sr = 0, sg = 0, sb = 0, n = 0;
+  for (const q of f.skin) { const [x, y] = T(q.x, q.y); for (let dy = -4; dy <= 4; dy++) for (let dx = -4; dx <= 4; dx++) { const X = clamp(Math.round(x + dx * ts), 0, w - 1), Y = clamp(Math.round(y + dy * ts), 0, h - 1), i = (Y * w + X) * 4; sr += d[i]; sg += d[i + 1]; sb += d[i + 2]; n++; } }
+  sr /= n; sg /= n; sb /= n; const sl = 0.299 * sr + 0.587 * sg + 0.114 * sb;
+  const spX = (f.spineX - f.minX) * ts, half = w / 2, noseY = (f.noseY - f.minY) * ts;
+  const feats = f.feats.map(e => { const [x, y] = T(e.x, e.y); return { x, y, rx: e.rx * ts, ry: e.ry * ts }; });
+  const hm = mk(w, h), hx = hm.getContext('2d', { willReadFrequently: true }), out = hx.createImageData(w, h), o = out.data;
+  let sum = 0;
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const i = (y * w + x) * 4; if (md[i + 3] < 128) continue;
+    const dr = d[i] - sr, dg = d[i + 1] - sg, db = d[i + 2] - sb, l = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
+    const dist = Math.max(Math.sqrt(0.35 * dr * dr + 0.45 * dg * dg + 0.2 * db * db) / 255, Math.abs(l - sl) / 255 * 1.1);
+    let pr = smooth(0.15, 0.27, dist);
+    if (y > noseY) pr *= smooth(0.5, 0.8, Math.abs(x - spX) / half);
+    for (const e of feats) { const q = ((x - e.x) / e.rx) ** 2 + ((y - e.y) / e.ry) ** 2; if (q < 1.7) pr *= smooth(1.0, 1.7, q); }
+    o[i + 3] = pr * 255; sum += pr;
+  }
+  // keep only hair that reaches in from the outline of the face (hair grows from outside the face)
+  const keep = new Uint8Array(w * h), q = new Int32Array(w * h); let qh = 0, qt = 0;
+  const cand = i => o[i * 4 + 3] > 110;
+  const edge = (x, y) => { for (const [ox, oy] of [[-3, 0], [3, 0], [0, -3], [0, 3]]) { const X = x + ox * ts, Y = y + oy * ts; if (X < 0 || Y < 0 || X >= w || Y >= h || md[((Y | 0) * w + (X | 0)) * 4 + 3] < 128) return true; } return false; };
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { const i = y * w + x; if (cand(i) && md[i * 4 + 3] >= 128 && edge(x, y)) { keep[i] = 1; q[qt++] = i; } }
+  while (qh < qt) { const i = q[qh++], x = i % w, y = (i / w) | 0; for (const j of [i - 1, i + 1, i - w, i + w]) { if (j < 0 || j >= w * h || keep[j]) continue; const jx = j % w; if (Math.abs(jx - x) > 1) continue; if (cand(j)) { keep[j] = 1; q[qt++] = j; } } }
+  sum = 0; for (let i = 0; i < w * h; i++) { if (!keep[i]) o[i * 4 + 3] = 0; else sum++; }
+  if (sum < w * h * 0.01) return null;
+  hx.putImageData(out, 0, 0);
+  // clean the mask: soften, then pull back to a firm edge
+  const bl = mk(w, h), bx = bl.getContext('2d', { willReadFrequently: true }); bx.filter = `blur(${Math.max(1.5, ts * 2.2)}px)`; bx.drawImage(hm, 0, 0); bx.filter = 'none';
+  const bd = bx.getImageData(0, 0, w, h); for (let i = 3; i < bd.data.length; i += 4) bd.data[i] = 255 * smooth(0.3, 0.62, bd.data[i] / 255); bx.putImageData(bd, 0, 0);
+  const hair = mk(w, h), hcx = hair.getContext('2d'); hcx.drawImage(faceC, 0, 0); maskWith(hair, bl);
+  // the face underneath gets a plain skin tone where the hair was
+  const sk = mk(w, h), skx = sk.getContext('2d');
+  const gr = skx.createLinearGradient(0, 0, 0, h); gr.addColorStop(0, `rgb(${sr * 0.92 | 0},${sg * 0.9 | 0},${sb * 0.9 | 0})`); gr.addColorStop(1, `rgb(${sr | 0},${sg | 0},${sb | 0})`);
+  skx.fillStyle = gr; skx.fillRect(0, 0, w, h); maskWith(sk, bl);
+  const cover = mk(w, h), cx2 = cover.getContext('2d'); cx2.drawImage(faceC, 0, 0); cx2.drawImage(sk, 0, 0);
+  return { cover, hair };
+}
+const FN = 22;
+function createFringe(b, canvas) {
+  const f = b.f, W = f.maxX - f.minX, H = f.maxY - f.minY, n = (FN + 1) * (FN + 1);
+  const rest = new Float32Array(n * 2), uv = new Float32Array(n * 2), idx = [];
+  for (let j = 0; j <= FN; j++) for (let i = 0; i <= FN; i++) { const k = j * (FN + 1) + i; rest[k * 2] = f.minX + i / FN * W; rest[k * 2 + 1] = f.minY + j / FN * H; uv[k * 2] = i / FN; uv[k * 2 + 1] = 1 - j / FN; }
+  for (let j = 0; j < FN; j++) for (let i = 0; i < FN; i++) { const a = j * (FN + 1) + i, b2 = a + 1, c = a + FN + 1, d = c + 1; idx.push(a, c, b2, b2, c, d); }
+  const g = new THREE.BufferGeometry(); g.setIndex(idx);
+  g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(n * 3), 3));
+  const nor = new Float32Array(n * 3); for (let q = 2; q < nor.length; q += 3) nor[q] = 1;
+  g.setAttribute('normal', new THREE.BufferAttribute(nor, 3)); g.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+  const mat = new THREE.ShaderMaterial({ uniforms: { ...U, front: { value: tex(canvas) } }, vertexShader: VS, fragmentShader: FS_FRINGE, transparent: true, depthTest: false, depthWrite: false });
+  const mesh = new THREE.Mesh(g, mat); mesh.frustumCulled = false; mesh.renderOrder = 20;
+  b.group.add(mesh);
+  b.fringe = { mesh, geom: g, rest, W, H, px: f.spineX, py: f.minY - 0.12 * H, phi: 0, phiV: 0, lift: 0, liftV: 0, launched: false };
+  bendFringe(b, 0);
+}
+function bendFringe(b, t) {
+  const F = b.fringe, pos = F.geom.attributes.position.array, n = F.rest.length / 2;
+  for (let k = 0; k < n; k++) {
+    const x = F.rest[k * 2], y = F.rest[k * 2 + 1];
+    const s = Math.tanh((x - F.px) / (0.07 * F.W));
+    const w = Math.pow(clamp((y - F.py) / (F.H * 1.1), 0, 1), 1.15);
+    const sway = F.lift * 0.07 * Math.sin(t * 2.2 + x * 0.025 + s) * w;
+    const a = -s * F.phi * w + sway;
+    const dx = x - F.px, dy = y - F.py;
+    let X = F.px + Math.cos(a) * dx - Math.sin(a) * dy + s * F.phi * w * F.W * 0.1;
+    let Y = F.py + Math.sin(a) * dx + Math.cos(a) * dy - F.lift * w * F.H * 0.05;
+    pos[k * 3] = X; pos[k * 3 + 1] = -Y; pos[k * 3 + 2] = 4 + F.lift * w * F.H * 0.2;
+  }
+  F.geom.attributes.position.needsUpdate = true;
+}
+function updateFringe(b, t, dt, el, opening) {
+  const F = b.fringe;
+  let pt = 0, lt = 0;
+  if (opening && el >= IMPACT_AT + 0.02) { pt = 0.3 + 0.05 * Math.sin(t * 1.3); lt = 1; if (!F.launched) { F.launched = true; F.phiV += 3; F.liftV += 5; } }
+  const K = 38, C = 2 * (opening ? 0.32 : 0.75) * Math.sqrt(K), steps = Math.max(1, Math.ceil(dt / (1 / 240))), h = dt / steps;
+  for (let i = 0; i < steps; i++) { F.phiV += (K * (pt - F.phi) - C * F.phiV) * h; F.phi += F.phiV * h; F.liftV += (K * (lt - F.lift) - C * F.liftV) * h; F.lift += F.liftV * h; }
+  bendFringe(b, t);
+}
+
+/* ---------- FX (2D overlay) ---------- */
+function toDisp(f, lx, ly) { const c = Math.cos(f.ang), s = Math.sin(f.ang); return [(f.ox + c * lx - s * ly) * sc, (f.oy + s * lx + c * ly) * sc]; }
+function scrap(x, y, vx, vy, delay, big) {
+  const r = Math.random, n = 5 + ((r() * 3) | 0), pts = [];
+  for (let i = 0; i < n; i++) { const a = i / n * Math.PI * 2 + (r() - .5) * 0.6, rr = 0.6 + r() * 0.5; pts.push([Math.cos(a) * rr, Math.sin(a) * rr * (0.8 + r() * 0.6)]); }
+  particles.push({ x, y, vx, vy, pts, s: (big ? 12 : 6) * (0.6 + r() * 0.9), rot: r() * 6, vr: (r() - .5) * 16, flip: r() * 6, vf: 5 + r() * 12, life: 0, max: 0.8 + r() * 0.9, delay, ink: r() < .25, strokes: r() < .6 });
+}
+function burst(b) {
+  const f = b.f, r = Math.random;
+  for (let i = 0; i < 34; i++) {
+    const ly = f.minY + r() * (f.maxY - f.minY);
+    const [x, y] = toDisp(f, f.spineX, ly);
+    const a = (r() < .5 ? Math.PI : 0) + (r() - .5) * 1.2 + f.ang, sp = 200 + r() * 600;
+    scrap(x, y, Math.cos(a) * sp, Math.sin(a) * sp - 150, 0.26 + r() * 0.05, r() < .5);
+  }
+}
+function emitFromTip(b, p) {
+  const [x, y] = tipScreen(b, p), r = Math.random;
+  for (let i = 0; i < 3; i++) { const a = (p.side > 0 ? 0 : Math.PI) + (r() - .5) * 1.4 + b.f.ang, sp = 120 + r() * 300; scrap(x, y + (r() - .5) * 60, Math.cos(a) * sp, Math.sin(a) * sp - 100, 0.05, false); }
+}
+const IMPACT_AT = 0.26, IMPACT_LEN = 0.075;
+function drawFx(t, dt) {
+  fxx.setTransform(dpr, 0, 0, dpr, 0, 0); fxx.clearRect(0, 0, dispW, dispH);
+  U.uImpact.value = 0;
+  if (!books.length && (!sfxState) && t - hudHold > 0.3) {
+    for (const fc of faces) {
+      const f = fc.frame, cr = f.core, pul = 0.5 + 0.5 * Math.sin(t * 3);
+      const pad = 10, corners = [[cr.minX - pad, cr.minY - pad], [cr.maxX + pad, cr.minY - pad], [cr.maxX + pad, cr.maxY + pad], [cr.minX - pad, cr.maxY + pad]].map(([x, y]) => toDisp(f, x, y));
+      const len = Math.min(28, (cr.maxX - cr.minX) * sc * 0.2);
+      fxx.save(); fxx.lineCap = 'round'; fxx.strokeStyle = `rgba(224,169,74,${0.75 + 0.25 * pul})`; fxx.lineWidth = 3; fxx.shadowColor = 'rgba(224,169,74,.8)'; fxx.shadowBlur = 10;
+      corners.forEach((c, i) => { const n = corners[(i + 1) % 4], p = corners[(i + 3) % 4]; const d1 = Math.hypot(n[0] - c[0], n[1] - c[1]), d2 = Math.hypot(p[0] - c[0], p[1] - c[1]);
+        fxx.beginPath(); fxx.moveTo(c[0] + (n[0] - c[0]) / d1 * len, c[1] + (n[1] - c[1]) / d1 * len); fxx.lineTo(c[0], c[1]); fxx.lineTo(c[0] + (p[0] - c[0]) / d2 * len, c[1] + (p[1] - c[1]) / d2 * len); fxx.stroke(); });
+      // the line it will split along, breathing
+      const [ax, ay] = toDisp(f, f.spineX, cr.minY), [bx2, by2] = toDisp(f, f.spineX, cr.maxY);
+      const lg = fxx.createLinearGradient(ax, ay, bx2, by2), ph = (t * 0.6) % 1;
+      lg.addColorStop(0, 'rgba(255,230,180,0)'); lg.addColorStop(clamp(ph - 0.15, 0, 1), 'rgba(255,230,180,0)'); lg.addColorStop(ph, `rgba(255,230,180,${0.35 + 0.3 * pul})`); lg.addColorStop(clamp(ph + 0.15, 0, 1), 'rgba(255,230,180,0)'); lg.addColorStop(1, 'rgba(255,230,180,0)');
+      fxx.strokeStyle = lg; fxx.lineWidth = 2; fxx.shadowBlur = 8; fxx.beginPath(); fxx.moveTo(ax, ay); fxx.lineTo(bx2, by2); fxx.stroke();
+      fxx.shadowBlur = 6; fxx.shadowColor = '#000'; fxx.font = `700 12px ${getComputedStyle(document.body).fontFamily}`; fxx.fillStyle = '#efe5cf';
+      fxx.fillText(fc.demo ? '見本の顔' : `顔 ${Math.round(fc.score * 100)}%`, corners[0][0], corners[0][1] - 9);
+      fxx.restore();
+    }
+  }
+  let shakeX = 0, shakeY = 0;
+  if (fxState) {
+    const e = t - fxState.t0;
+    if (fxState.kind === 'open') {
+      const impact = e >= IMPACT_AT && e < IMPACT_AT + IMPACT_LEN;
+      U.uImpact.value = impact ? 1 : 0;
+      for (const b of books) {
+        const f = b.f, [cx, cy] = toDisp(f, f.spineX, (f.minY + f.maxY) / 2);
+        const fr = (f.maxY - f.minY) * sc * 0.5, R = Math.hypot(dispW, dispH);
+        // seam: a straight hairline of light that runs down the split, then tears
+        if (e < IMPACT_AT + 0.25) {
+          const q = smooth(0.02, IMPACT_AT - 0.02, e), fade = 1 - smooth(IMPACT_AT + 0.05, IMPACT_AT + 0.25, e);
+          const [ax, ay] = toDisp(f, f.spineX, f.minY + 4), [bx2, by2] = toDisp(f, f.spineX, f.minY + 4 + (f.maxY - f.minY - 8) * q);
+          fxx.save(); fxx.globalAlpha = fade; fxx.lineCap = 'round';
+          fxx.strokeStyle = impact ? '#ffffff' : 'rgba(255,214,140,0.9)'; fxx.shadowColor = impact ? '#ffffff' : '#ffcf7a'; fxx.shadowBlur = 22; fxx.lineWidth = 3 + 5 * smooth(IMPACT_AT - 0.08, IMPACT_AT, e);
+          fxx.beginPath(); fxx.moveTo(ax, ay); fxx.lineTo(bx2, by2); fxx.stroke();
+          fxx.shadowBlur = 0; fxx.strokeStyle = '#fffaf0'; fxx.lineWidth = 1.4;
+          const rr = rng(b.seed); fxx.beginPath(); fxx.moveTo(ax, ay);
+          for (let i = 1; i <= 40; i++) { const k = i / 40; fxx.lineTo(ax + (bx2 - ax) * k + (rr() - .5) * 2.2, ay + (by2 - ay) * k); } fxx.stroke();
+          // spark at the leading point
+          if (q < 1) { const sg = fxx.createRadialGradient(bx2, by2, 0, bx2, by2, 26); sg.addColorStop(0, 'rgba(255,250,235,1)'); sg.addColorStop(1, 'rgba(255,200,120,0)'); fxx.fillStyle = sg; fxx.beginPath(); fxx.arc(bx2, by2, 26, 0, 7); fxx.fill(); }
+          fxx.restore();
+        }
+        // focus lines, redrawn on twos
+        if (e > IMPACT_AT - 0.02 && e < IMPACT_AT + 0.75) {
+          const a = impact ? 1 : Math.pow(clamp(1 - (e - IMPACT_AT - IMPACT_LEN) / 0.6, 0, 1), 1.5);
+          const r = rng(((t * 12) | 0) + b.idx * 99);
+          fxx.save();
+          for (let i = 0; i < (impact ? 150 : 64); i++) {
+            const an = r() * Math.PI * 2, wd = (impact ? 0.006 : 0.003) + r() * (impact ? 0.02 : 0.012), r0 = fr * ((impact ? 1.35 : 1.65) + r() * 0.9 + (e - IMPACT_AT) * 0.5);
+            const below = Math.sin(an) > 0.35 ? 0.35 : 1;
+            fxx.fillStyle = impact ? '#140b18' : `rgba(15,8,20,${0.6 * a * below})`;
+            fxx.beginPath(); fxx.moveTo(cx + Math.cos(an - wd) * R, cy + Math.sin(an - wd) * R); fxx.lineTo(cx + Math.cos(an) * r0, cy + Math.sin(an) * r0); fxx.lineTo(cx + Math.cos(an + wd) * R, cy + Math.sin(an + wd) * R); fxx.fill();
+          }
+          fxx.restore();
+        }
+      }
+      // flash right after the hit
+      const fl = e > IMPACT_AT + IMPACT_LEN ? Math.exp(-(e - IMPACT_AT - IMPACT_LEN) * 30) : 0;
+      if (fl > 0.01) { fxx.fillStyle = `rgba(255,246,226,${0.38 * fl})`; fxx.fillRect(0, 0, dispW, dispH); }
+      // a small pre-hit pulse
+      if (e < 0.1) { fxx.fillStyle = `rgba(255,240,210,${0.25 * (1 - e / 0.1)})`; fxx.fillRect(0, 0, dispW, dispH); }
+      // directional shake along the split
+      if (e > IMPACT_AT) { const d = e - IMPACT_AT; const amp = 11 * Math.exp(-d * 7); shakeX = amp * Math.sin(d * 72); shakeY = amp * 0.25 * Math.sin(d * 51 + 1); }
+      if (e > 2.6) fxState = null;
+    } else if (fxState.kind === 'close') {
+      const e = t - fxState.t0, hit = 0.42;
+      if (e > hit && e < hit + 0.12) { fxx.fillStyle = `rgba(255,250,236,${0.35 * (1 - (e - hit) / 0.12)})`; fxx.fillRect(0, 0, dispW, dispH); }
+      if (e > hit) { const d = e - hit; shakeY = 6 * Math.exp(-d * 9) * Math.sin(d * 60); }
+      if (e > 1.2) fxState = null;
+    }
+  }
+  stage.style.transform = Math.abs(shakeX) + Math.abs(shakeY) > 0.2 ? `translate(${shakeX.toFixed(1)}px,${shakeY.toFixed(1)}px)` : '';
+  // torn paper scraps
+  particles = particles.filter(p => p.life < p.max + p.delay);
+  const hideScraps = U.uImpact.value > 0.5;
+  for (const p of particles) {
+    p.life += dt; const l = p.life - p.delay; if (l < 0 || hideScraps) continue;
+    p.vy += 420 * dt; p.vx *= Math.pow(0.35, dt); p.vy *= Math.pow(0.6, dt); p.x += p.vx * dt; p.y += p.vy * dt; p.rot += p.vr * dt; p.flip += p.vf * dt;
+    const a = clamp(1 - l / p.max, 0, 1) * smooth(0, 0.04, l);
+    const draw = (ox, oy, al) => {
+      fxx.save(); fxx.translate(p.x + ox, p.y + oy); fxx.rotate(p.rot); fxx.scale(Math.cos(p.flip) * p.s, p.s); fxx.globalAlpha = al;
+      fxx.beginPath(); p.pts.forEach(([x, y], i) => i ? fxx.lineTo(x, y) : fxx.moveTo(x, y)); fxx.closePath();
+      fxx.fillStyle = p.spark ? '#ff9a6a' : p.ink ? '#2a1d26' : (Math.cos(p.flip) > 0 ? '#f3e9d3' : '#cdbb97'); fxx.fill();
+      if (p.strokes && !p.ink) { fxx.strokeStyle = 'rgba(40,25,30,.7)'; fxx.lineWidth = 0.12; fxx.beginPath(); fxx.moveTo(-0.1, -0.5); fxx.lineTo(-0.1, 0.4); fxx.moveTo(0.25, -0.4); fxx.lineTo(0.2, 0.1); fxx.stroke(); }
+      fxx.restore();
+    };
+    if (l < 0.12) for (let k = 3; k >= 1; k--) draw(-p.vx * dt * k * 1.4, -p.vy * dt * k * 1.4, a * 0.18 * (4 - k));
+    draw(0, 0, a);
+  }
+}
+
+/* ---------- sound ---------- */
+let actx = null, soundOn = true, noiseBuf = null;
+function audio() {
+  if (!soundOn) return null;
+  try {
+    if (!actx) { actx = new (window.AudioContext || window.webkitAudioContext)(); noiseBuf = actx.createBuffer(1, actx.sampleRate * 0.6, actx.sampleRate); const d = noiseBuf.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1; }
+    if (actx.state === 'suspended') actx.resume();
+    return actx;
+  } catch (e) { return null; }
+}
+function noise(at, dur, f0, f1, vol, type = 'bandpass', q = 0.9) {
+  const a = audio(); if (!a) return;
+  const s = a.createBufferSource(); s.buffer = noiseBuf;
+  const fl = a.createBiquadFilter(); fl.type = type; fl.Q.value = q; fl.frequency.setValueAtTime(f0, a.currentTime + at); fl.frequency.exponentialRampToValueAtTime(f1, a.currentTime + at + dur);
+  const g = a.createGain(); g.gain.setValueAtTime(0.0001, a.currentTime + at); g.gain.exponentialRampToValueAtTime(vol, a.currentTime + at + 0.006); g.gain.exponentialRampToValueAtTime(0.0001, a.currentTime + at + dur);
+  s.connect(fl).connect(g).connect(a.destination); s.start(a.currentTime + at, Math.random() * 0.3); s.stop(a.currentTime + at + dur + 0.05);
+}
+function thump(at, vol) {
+  const a = audio(); if (!a) return;
+  const o = a.createOscillator(), g = a.createGain(); o.type = 'sine';
+  o.frequency.setValueAtTime(150, a.currentTime + at); o.frequency.exponentialRampToValueAtTime(42, a.currentTime + at + 0.25);
+  g.gain.setValueAtTime(0.0001, a.currentTime + at); g.gain.exponentialRampToValueAtTime(vol, a.currentTime + at + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, a.currentTime + at + 0.35);
+  o.connect(g).connect(a.destination); o.start(a.currentTime + at); o.stop(a.currentTime + at + 0.4);
+}
+function sndOpen() {
+  noise(0, IMPACT_AT, 400, 4200, 0.18, 'bandpass', 2.5);          // rising tear
+  thump(IMPACT_AT, 0.6); noise(IMPACT_AT, 0.16, 6000, 2500, 0.35, 'highpass', 0.5);
+  [0.31, 0.35, 0.385, 0.415, 0.44].forEach(d => { noise(d, 0.08, 2200 + Math.random() * 1600, 1300, 0.2, 'bandpass', 1.2); noise(d + 0.012, 0.07, 2600 + Math.random() * 1600, 1500, 0.16, 'bandpass', 1.2); });
+}
+function sndClose() { for (let i = 0; i < 5; i++) noise(i * 0.035, 0.06, 2600, 1400, 0.12); noise(0.4, 0.16, 1200, 250, 0.45, 'lowpass', 0.7); thump(0.42, 0.35); }
+
+/* ---------- SFX lettering, driven by the frame clock ---------- */
+let sfxState = null, hudHold = 0;
+function sfx(text, b, kind) {
+  const el = $('#sfx'); const f = b.f;
+  const size = clamp((f.maxY - f.minY) * sc * 0.16, 22, 62);
+  const scales = [...text].map((_, i) => 1.3 - 0.5 * i / Math.max(1, text.length - 1));
+  el.style.fontSize = size + 'px';
+  el.innerHTML = [...text].map((c, i) => `<span style="font-size:${scales[i].toFixed(2)}em">${c}</span>`).join('');
+  // negative space: above-left of the head, or above-right if there's no room
+  const [hx, hy] = toDisp(f, f.minX, f.minY);
+  el.style.transform = 'none';
+  const w = el.offsetWidth, h = el.offsetHeight;
+  let x = hx - w * 0.55, y = hy - h * 1.05;
+  if (kind === 'close') { const [cx, cy] = toDisp(f, f.maxX, f.maxY); x = cx - w * 0.2; y = cy - h * 0.8; }
+  const ang = kind === 'close' ? 6 : -10, rad = ang * Math.PI / 180;
+  const bw = Math.abs(w * Math.cos(rad)) + Math.abs(h * Math.sin(rad)), bh = Math.abs(w * Math.sin(rad)) + Math.abs(h * Math.cos(rad));
+  x = clamp(x, 6 + (bw - w) / 2, dispW - w - 6 - (bw - w) / 2); y = clamp(y, 6 + (bh - h) / 2, dispH - h - 6 - (bh - h) / 2);
+  sfxState = { t0: now(), x, y, ang, start: kind === 'close' ? 0.36 : IMPACT_AT, n: text.length };
+}
+function drawSfx(t) {
+  const el = $('#sfx'); if (!sfxState) { el.style.opacity = 0; return; }
+  const e = t - sfxState.t0, s = sfxState;
+  el.style.opacity = 1;
+  el.style.transform = `translate(${s.x}px,${s.y}px) rotate(${s.ang}deg)`;
+  const spans = el.children, twos = Math.floor(t * 12);
+  let alive = false;
+  for (let i = 0; i < spans.length; i++) {
+    const le = e - s.start - i * 0.045;
+    const r = rng(twos * 31 + i);
+    let op = 0, sc2 = 1;
+    if (le > 0) { op = 1; sc2 = 1 + 1.4 * Math.exp(-le * 14) * Math.cos(le * 30); }
+    const out = e - (s.start + 1.25 + i * 0.03);
+    if (out > 0) { op = clamp(1 - out / 0.35, 0, 1); sc2 *= 1 + out * 0.4; }
+    if (op > 0) alive = true;
+    const jx = (r() - .5) * 3, jy = (r() - .5) * 3 + (i % 2 ? 1 : -1) * 4;
+    spans[i].style.opacity = op;
+    spans[i].style.transform = `translate(${jx.toFixed(1)}px,${jy.toFixed(1)}px) scale(${sc2.toFixed(3)}) skewX(-8deg)`;
+  }
+  if (!alive && e > s.start + 0.5) { sfxState = null; hudHold = t; }
+}
+
+/* ---------- drag to spread the pages ---------- */
+const dragOpen = { L: 0, R: 0 };
+let drag = null;
+stage.addEventListener('pointerdown', e => {
+  const b = books.find(x => x.state === 'open' || x.state === 'opening');
+  if (!b) return;
+  const r = stage.getBoundingClientRect(), f = b.f, [sx] = toDisp(f, f.spineX, (f.minY + f.maxY) / 2);
+  const side = e.clientX - r.left < sx ? -1 : 1;
+  drag = { id: e.pointerId, side, x0: e.clientX, d0: side < 0 ? dragOpen.L : dragOpen.R, w: Math.max(80, (f.maxX - f.minX) * sc) };
+  try { stage.setPointerCapture(e.pointerId); } catch (_) {}
+  stage.classList.add('dragging');
+});
+stage.addEventListener('pointermove', e => {
+  if (!drag || e.pointerId !== drag.id) return;
+  const d = clamp(drag.d0 + (e.clientX - drag.x0) * drag.side / (drag.w * 0.9), 0, 1);
+  if (Math.abs(e.clientX - drag.x0) > 6) drag.moved = true;
+  if (drag.side < 0) dragOpen.L = d; else dragOpen.R = d;
+  if (Math.abs(e.clientX - drag.x0) > 30 && Math.random() < 0.12) noise(0, 0.07, 2400 + Math.random() * 1500, 1400, 0.12, 'bandpass', 1.2);
+});
+let lastDragMoved = false;
+const endDrag = e => { if (drag && (!e || e.pointerId === drag.id)) { lastDragMoved = !!drag.moved; drag = null; stage.classList.remove('dragging'); } };
+stage.addEventListener('pointerup', endDrag); stage.addEventListener('pointercancel', endDrag);
+
+/* ---------- writing UI: prompt chip and glowing pen tip ---------- */
+function drawInkUi(t) {
+  const hint = $('#hint'), b = books.find(x => x.state === 'open' || x.state === 'opening');
+  const showHint = !!b && t - b.t0 > 1.6 && !inkLines.length && !inkFocus;
+  if (showHint) {
+    const f = b.f, [x, y] = toDisp(f, f.spineX, f.maxY + (f.maxY - f.minY) * 0.06);
+    hint.hidden = false;
+    hint.style.transform = `translate(${clamp(x - hint.offsetWidth / 2, 6, dispW - hint.offsetWidth - 6)}px,${clamp(y, 6, dispH - 40)}px)`;
+  } else hint.hidden = true;
+  $('#ink').classList.toggle('nudge', showHint);
+  for (const bk of books) {
+    if (!bk.inkPen || bk.state === 'closing') continue;
+    const f = bk.f, [px, py] = bk.inkPen, [x, y] = toDisp(f, f.minX + px / bk.ts, f.minY + py / bk.ts);
+    const r = 16 + 4 * Math.sin(t * 20);
+    const g = fxx.createRadialGradient(x, y, 0, x, y, r);
+    g.addColorStop(0, 'rgba(255,236,200,.95)'); g.addColorStop(0.35, 'rgba(240,90,50,.55)'); g.addColorStop(1, 'rgba(240,90,50,0)');
+    fxx.save(); fxx.setTransform(dpr, 0, 0, dpr, 0, 0); fxx.fillStyle = g; fxx.beginPath(); fxx.arc(x, y, r, 0, 7); fxx.fill();
+    if (Math.random() < 0.5) particles.push({ x, y, vx: (Math.random() - .5) * 60, vy: -40 - Math.random() * 60, pts: [[-.5, -.5], [.5, -.5], [.5, .5], [-.5, .5]], s: 2 + Math.random() * 2, rot: 0, vr: 3, flip: 0, vf: 0, life: 0, max: 0.5, delay: 0, ink: false, strokes: false, spark: true });
+    fxx.restore();
+  }
+}
+
+/* ---------- actions ---------- */
+function isOpen() { return books.some(b => b.state === 'opening' || b.state === 'open'); }
+function faceUniforms() {
+  U.uFaces.value.forEach((v, i) => {
+    const b = books[i]; if (!b || b.state === 'closed') { v.w = 0; return; }
+    const f = b.f, [cx, cy] = toDisp(f, f.spineX, (f.minY + f.maxY) / 2);
+    v.set(cx, -cy, (f.maxY - f.minY) * sc * 0.5, 1);
+  });
+}
+function openAll() {
+  if (!faces.length) { msg('顔が見つかりません。正面を向いた明るい写真で試してください。'); return; }
+  frozen = true;
+  books.forEach(b => scene.remove(b.group)); books = [];
+  { const c = mk(24, 24), x = c.getContext('2d', { willReadFrequently: true }); { const fr = faces[0].frame, hh = (fr.maxY - fr.minY) * 1.3; x.drawImage(src, fr.ox - hh / 2, fr.oy - hh / 2, hh, hh, 0, 0, 24, 24); } const d = x.getImageData(0, 0, 24, 24).data; let m = 0; for (let i = 0; i < d.length; i += 4) m += (0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2]) / 255; U.uThresh.value = clamp(m / 576 * 0.95, 0.28, 0.62); }
+  dragOpen.L = dragOpen.R = 0;
+  books = faces.map((fc, i) => createBook(fc, i));
+  books.forEach(burst);
+  fxState = { t0: now(), kind: 'open' };
+  sfx('バラララッ', books[0], 'open'); sndOpen();
+  $('#openLabel').textContent = 'とじる';
+  msg('ページの左右を外側へドラッグすると、さらにひらきます。');
+}
+function closeAll() {
+  const t = now();
+  for (const b of books) { if (b.state === 'closed') continue; b.state = 'closing'; b.t0 = t; }
+  fxState = { t0: t, kind: 'close' }; sndClose();
+  if (books[0]) sfx('パタン', books[0], 'close');
+  $('#openLabel').textContent = 'ひらく';
+}
+function toggle() { isOpen() ? closeAll() : openAll(); }
+$('#btnOpen').addEventListener('click', toggle);
+window.addEventListener('keydown', e => { if (e.code === 'Space' && document.activeElement !== $('#ink') && !e.repeat) { e.preventDefault(); toggle(); } });
+
+$('#writeForm').addEventListener('submit', e => {
+  e.preventDefault(); const v = $('#ink').value.trim(); if (!v) return;
+  const before = inkLines.join('').length;
+  inkLines.push(v); if (inkLines.length > 3) inkLines.shift();
+  $('#ink').value = '';
+  const shown = Math.min(before, inkLines.slice(0, -1).join('').length);
+  for (const b of books) { b.inkShown = -1; b.inkT = shown / 14; }
+  if (!isOpen() && faces.length) openAll();
+  msg('');
+});
+
+$('#btnHair').addEventListener('click', e => { hairOn = !hairOn; e.currentTarget.setAttribute('aria-pressed', hairOn); e.currentTarget.textContent = hairOn ? '髪をなびかせる オン' : '髪をなびかせる オフ'; if (isOpen()) { closeAll(); setTimeout(() => { if (!isOpen()) openAll(); }, 900); } });
+$('#ink').addEventListener('focus', () => { inkFocus = true; });
+$('#ink').addEventListener('blur', () => { inkFocus = false; });
+$('#hint').addEventListener('click', () => { if (!lastDragMoved) $('#ink').focus(); lastDragMoved = false; });
+$('#btnSound').addEventListener('click', e => { soundOn = !soundOn; e.currentTarget.setAttribute('aria-pressed', soundOn); e.currentTarget.textContent = soundOn ? '音 オン' : '音 オフ'; });
+
+function resetSource() { books.forEach(b => scene.remove(b.group)); books = []; frozen = false; grade = 0; fxState = null; sfxState = null; particles = []; $('#openLabel').textContent = 'ひらく'; }
+function stopVideo() { if (video && video.srcObject) video.srcObject.getTracks().forEach(t => t.stop()); video = null; }
+
+function useDemo() { stopVideo(); resetSource(); mode = 'demo'; faces = drawDemo(); layout(); msg(''); pill('見本の顔', 'ok'); }
+
+/* sample faces: an original illustration plus CGI renders (no real people) */
+const SAMPLES = [
+  { id: 'demo', label: 'イラスト' },
+  { id: 'cgi-model-11', label: '正面' },
+  { id: 'cgi-model-14', label: '少し横' },
+  { id: 'cgi-model-13', label: '横向き' },
+  { id: 'cgi-model-28', label: 'かしげ顔' }
+];
+const sampleUrl = id => (window.__KAO_SAMPLES && window.__KAO_SAMPLES[id]) || `samples/${id}.jpg`;
+function markSample(id) { document.querySelectorAll('#samples button').forEach(b => b.setAttribute('aria-pressed', b.dataset.id === id)); }
+function buildSamples() {
+  const row = $('#samples');
+  for (const s of SAMPLES) {
+    const b = document.createElement('button'); b.type = 'button'; b.dataset.id = s.id; b.setAttribute('aria-pressed', s.id === 'demo');
+    const img = document.createElement('img'); img.alt = ''; img.width = 44; img.height = 54;
+    if (s.id === 'demo') { const c = mk(88, 108); c.getContext('2d').drawImage(src, 180, 220, 440, 540, 0, 0, 88, 108); img.src = c.toDataURL('image/jpeg', 0.85); }
+    else { img.src = sampleUrl(s.id); img.onerror = () => b.remove(); }
+    const t = document.createElement('span'); t.textContent = s.label;
+    b.append(img, t);
+    b.addEventListener('click', () => {
+      markSample(s.id);
+      if (s.id === 'demo') useDemo();
+      else { const im = new Image(); im.onload = () => loadImageEl(im, null); im.onerror = () => msg('見本の画像を読み込めませんでした。'); im.src = sampleUrl(s.id); }
+    });
+    row.append(b);
+  }
+}
+
+let pendingImage = false;
+async function loadImageEl(img, url) {
+    stopVideo(); resetSource(); mode = 'image';
+    const k = Math.min(1, 1400 / Math.max(img.width, img.height));
+    src.width = Math.round(img.width * k); src.height = Math.round(img.height * k);
+    srcx.drawImage(img, 0, 0, src.width, src.height); if (url) URL.revokeObjectURL(url);
+    faces = []; layout();
+    pill('顔を探しています', 'busy');
+    if (!modelsReady) { msg('顔認識モデルを読み込み中です。読み込みが終わると自動で探します。'); pendingImage = true; return; }
+    await detectNow(512);
+}
+async function useImage(file) {
+  if (!file || !file.type.startsWith('image/')) return;
+  markSample(null);
+  const url = URL.createObjectURL(file); const img = new Image();
+  img.onload = () => loadImageEl(img, url);
+  img.src = url;
+}
+$('#file').addEventListener('change', e => useImage(e.target.files[0]));
+stage.addEventListener('dragover', e => { e.preventDefault(); $('#drop').hidden = false; });
+stage.addEventListener('dragleave', () => { $('#drop').hidden = true; });
+stage.addEventListener('drop', e => { e.preventDefault(); $('#drop').hidden = true; useImage(e.dataTransfer.files[0]); });
+
+$('#snap').addEventListener('change', e => useImage(e.target.files[0]));
+$('#btnCam').addEventListener('click', async () => {
+  // inside the claude.ai viewer live video is blocked, so take a selfie with the device camera instead
+  let framed = false; try { framed = window.self !== window.top; } catch (_) { framed = true; }
+  if (framed) { $('#snap').value = ''; $('#snap').click(); msg('カメラで顔を撮ると、その写真で本がひらけます。'); return; }
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false });
+    stopVideo(); resetSource();
+    video = document.createElement('video'); video.playsInline = true; video.muted = true; video.srcObject = stream; await video.play();
+    mode = 'video'; src.width = video.videoWidth || 1280; src.height = video.videoHeight || 720; faces = []; layout();
+    msg(modelsReady ? '' : '顔認識モデルを読み込み中です…');
+  } catch (err) {
+    const n = err && err.name;
+    const why = !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia
+      ? 'このページの開き方ではカメラを使えません。ダウンロード版を Chrome か Edge で開いてください。'
+      : n === 'NotAllowedError' || n === 'SecurityError' ? 'カメラが許可されていません。アドレスバー左のアイコンからカメラを「許可」にして、もう一度押してください。（claude.ai の公開ページではカメラは使えません）'
+      : n === 'NotFoundError' || n === 'OverconstrainedError' ? 'カメラが見つかりません。接続を確認してください。'
+      : n === 'NotReadableError' || n === 'AbortError' ? 'カメラを他のアプリが使っています。ビデオ会議などを閉じてから、もう一度押してください。'
+      : `カメラを起動できませんでした（${n || '不明なエラー'}）。`;
+    msg(why + ' 写真を選んで試すこともできます。');
+  }
+});
+
+/* ---------- detection ---------- */
+const MODEL_BASES = ['model', 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.13/model'];
+async function loadModels() {
+  if (!window.faceapi) { pill('顔認識なし', ''); msg('顔認識ライブラリを読み込めませんでした。見本の顔だけ使えます。'); return; }
+  pill('モデル読み込み中', 'busy');
+  for (const base of MODEL_BASES) {
+    try {
+      await faceapi.nets.tinyFaceDetector.loadFromUri(base);
+      await faceapi.nets.faceLandmark68TinyNet.loadFromUri(base);
+      await faceapi.nets.faceExpressionNet.loadFromUri(base);
+      modelsReady = true; break;
+    } catch (e) { /* try the next location */ }
+  }
+  if (!modelsReady) { pill('顔認識なし', ''); msg('顔認識モデルを読み込めませんでした。見本の顔だけ使えます。'); return; }
+  pill(mode === 'demo' ? '見本の顔' : '準備完了', 'ok');
+  if (pendingImage) { pendingImage = false; detectNow(512); }
+}
+function topExpr(ex) { let best = 'neutral', v = 0; for (const k in ex) if (typeof ex[k] === 'number' && ex[k] > v) { v = ex[k]; best = k; } return best; }
+async function detectNow(size) {
+  if (!modelsReady || detecting) return; detecting = true;
+  try {
+    const opts = new faceapi.TinyFaceDetectorOptions({ inputSize: size, scoreThreshold: 0.45 });
+    const res = await faceapi.detectAllFaces(src, opts).withFaceLandmarks(true).withFaceExpressions();
+    const found = res.sort((a, b) => b.detection.box.area - a.detection.box.area).slice(0, 4)
+      .map(r => ({ frame: frameFromLandmarks(r.landmarks.positions), score: r.detection.score, expr: topExpr(r.expressions) }));
+    if (!frozen) faces = found;
+    const n = faces.length;
+    pill(n ? `顔を ${n} つ検知` : '顔を探しています', n ? 'ok' : 'busy');
+    if (mode === 'image') msg(n ? '' : '顔が見つかりませんでした。正面を向いた、顔が大きめの写真で試してください。');
+  } catch (e) { /* skip a failed frame */ }
+  detecting = false;
+}
+
+/* ---------- loop ---------- */
+let last = now();
+function frame() {
+  const t = now(), dt = Math.min(0.05, Math.max(0, t - last)); last = t;
+  if (mode === 'video' && video && !frozen && video.readyState >= 2) {
+    srcx.setTransform(-1, 0, 0, 1, src.width, 0); srcx.drawImage(video, 0, 0, src.width, src.height); srcx.setTransform(1, 0, 0, 1, 0, 0);
+    srcTex.needsUpdate = true;
+    if (t - lastDet > 0.12) { lastDet = t; detectNow(320); }
+  }
+  for (const b of books) updateBook(b, t, dt);
+  const closed = books.filter(b => b.state === 'closed');
+  if (closed.length) {
+    closed.forEach(b => { scene.remove(b.group); b.group.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material) { const u = o.material.uniforms; if (u && u.front && u.front.value) u.front.value.dispose(); if (u && u.back && u.back.value) u.back.value.dispose(); if (o.material.map) o.material.map.dispose(); o.material.dispose(); } }); });
+    books = books.filter(b => b.state !== 'closed'); if (!books.length) frozen = false;
+  }
+  // the grade holds until every page has shut
+  const gt = books.some(b => b.state !== 'closing') ? 1 : books.length ? 0.85 : 0;
+  grade += (gt - grade) * Math.min(1, dt * (gt > grade ? 5 : 4));
+  if (fxState && fxState.kind === 'open' && t - fxState.t0 < IMPACT_AT) grade = Math.min(grade, 0.25 * (t - fxState.t0) / IMPACT_AT);
+  U.uGrade.value = grade; faceUniforms();
+  $('#vig').style.opacity = (0.9 * grade).toFixed(3);
+  stage.classList.toggle('open', isOpen());
+  drawFx(t, dt);
+  drawSfx(t);
+  drawInkUi(t);
+  renderer.render(scene, camera);
+  requestAnimationFrame(frame);
+}
+
+// boot
+faces = drawDemo();
+buildSamples();
+layout();
+pill('見本の顔', 'ok');
+if (document.fonts) {
+  document.fonts.load('20px "Zen Kurenaido"', POOL.join('') + '記録第号いまの気分〇一二三四五六七八九' + Object.values(MOOD).join('')).catch(() => {});
+  document.fonts.load('40px "Dela Gothic One"', 'バラララッパタン').catch(() => {});
+}
+requestAnimationFrame(frame);
+loadModels();
+window.__kao = { toggle, get faces() { return faces; }, get books() { return books; }, useImage, dragOpen };
+})();
+</script>
+
+</body>
+</html>
