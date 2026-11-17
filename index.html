@@ -493,8 +493,18 @@ function bendPage(p, f) {
       const z = ZS[i] + zOff + wave * sv * t * t;
       pos[k] = XS[i]; pos[k + 1] = y; pos[k + 2] = z;
       const ph = PH[i]; nor[k] = side > 0 ? Math.sin(ph) : -Math.sin(ph); nor[k + 1] = 0; nor[k + 2] = Math.cos(ph);
-      const hz = Math.max(0, z - zOff);
-      sp[k] = XS[i] + hz * shx; sp[k + 1] = y + hz * shy; sp[k + 2] = 0.2;
+      if (p.isCover && p.rel > 0.001) {
+        // the face half keeps its shape: cheeks, forehead and nose stand out along the surface normal
+        const xr = side > 0 ? hx - t * L : hx + t * L, yr = f.minY + v * H, e = 1.5;
+        const D = faceDepth(f, xr, yr) * p.rel;
+        const gx = (faceDepth(f, xr + e, yr) - faceDepth(f, xr - e, yr)) / (2 * e) * p.rel, gy = (faceDepth(f, xr, yr + e) - faceDepth(f, xr, yr - e)) / (2 * e) * p.rel;
+        const nx = nor[k], nz = nor[k + 2], ds = side > 0 ? -gx : gx, Tx = side > 0 ? -Math.cos(ph) : Math.cos(ph), Tz = Math.sin(ph);
+        pos[k] += nx * D; pos[k + 2] += nz * D;
+        let ax = nx - ds * Tx, ay = gy, az = nz - ds * Tz; const nl = Math.hypot(ax, ay, az) || 1;
+        nor[k] = ax / nl; nor[k + 1] = ay / nl; nor[k + 2] = az / nl;
+      }
+      const hz = Math.max(0, pos[k + 2] - zOff);
+      sp[k] = pos[k] + hz * shx; sp[k + 1] = y + hz * shy; sp[k + 2] = 0.2;
     }
   }
   p.geom.attributes.position.needsUpdate = true; p.geom.attributes.normal.needsUpdate = true;
@@ -514,6 +524,9 @@ function createBook(face, idx) {
   let coverSrc = faceC;
   const HM = hairOn && f.skin ? hairMaskFor(f) : null;
   if (HM) coverSrc = inpaintCover(faceC, HM, f, ts, raw);
+  const FM = f.feats && f.skin ? featureMask(f, faceC, ts) : null;
+  let featC = null;
+  if (FM) { coverSrc = inpaintMask(coverSrc, FM, ts); featC = mk(Wp, Hp); featC.getContext('2d').drawImage(faceC, 0, 0); maskWith(featC, FM); }
   const halves = [{ side: -1, sx: 0, sw: spP }, { side: 1, sx: spP, sw: Wp - spP }];
 
   const fsz = Hp * 0.048;
@@ -588,6 +601,7 @@ function createBook(face, idx) {
   const book = { face, f, group, pages, base, baseC, raw, Bfull: boundsOf(raw), ts, spP, seed, glow, lines: pick(9), state: 'opening', t0: now(), inkT: 0, inkShown: -1, idx, inkPage: inkInfo, inkPen: null };
   renderBase(book, 0); renderInkPage(book, 0);
   if (HM) createHairLayer(book, HM);
+  if (featC) createFeatures(book, featC, FM);
   scene.add(group); placeBook(book);
   return book;
 }
@@ -680,6 +694,7 @@ function updateBook(b, t, dt) {
     p.wave = clamp(Math.abs(p.vel) * 3.2, 0, 22) * (p.isCover ? 0.5 : 1) + (el > p.delay + 1.2 && opening ? 2.5 * Math.sin(t * 2.3 + p.phase) : 0);
     const settledFlat = opening && !p.isCover && p.k < NPAGES - 1 && el > p.delay + 1.0 && p.theta < 0.3;
     p.mesh.visible = p.smesh.visible = !settledFlat && (p.isCover || p.theta > 0.002 || (opening && el > p.delay - 0.03));
+    p.rel = p.isCover ? clamp(p.theta / 0.6, 0, 1) : 0;
     p.mesh.material.uniforms.lift.value = clamp(p.theta / 0.9, 0, 1);
     const casts = p.isCover || p.k === NPAGES - 1;
     p.smesh.visible = p.smesh.visible && casts;
@@ -699,6 +714,7 @@ function updateBook(b, t, dt) {
     if (n !== b.inkShown) { b.inkShown = n; renderInkPage(b, n); }
   }
   if (b.hairL) updateHairLayer(b, t, dt, el, opening);
+  if (b.feat) updateFeatures(b, t, dt, el, opening);
 }
 
 /* ---------- hair: found from the scalp down, moved from its roots ---------- */
@@ -734,7 +750,7 @@ function hairMaskFor(f) {
       let v = smooth(0.12, 0.22, dist(r, g, b, skin)) * (1 - smooth(0.17, 0.3, dist(r, g, b, hairC)));
       if (v < 0.05) continue;
       if (inFace[i + 3] > 128) { if (y > noseY) v *= smooth(0.5, 0.8, Math.abs(x - spX) / half); for (const e of feats) { const q = ((x - e.x) / e.rx) ** 2 + ((y - e.y) / e.ry) ** 2; if (q < 1.7) v *= smooth(1.0, 1.7, q); } }
-      else if (y > chinY + 0.04 * H * ts2 && Math.abs(x - spX) < half * 1.1) v = 0;   // neck and chest
+      else if (y > chinY - 0.02 * H * ts2 && Math.abs(x - spX) < half * 1.5) v = 0;   // neck and chest
       pr[y * w + x] = v;
     }
     // keep only what is connected to the hair above the hairline
@@ -754,6 +770,7 @@ function hairMaskFor(f) {
   const under = mk(w, h), ux = under.getContext('2d'); ux.filter = `blur(${Math.max(4, ts2 * 9)}px)`; ux.drawImage(img, 0, 0); ux.filter = 'none';
   const grow = mk(w, h), gx = grow.getContext('2d'); gx.filter = `blur(${Math.max(3, ts2 * 6)}px)`; gx.drawImage(sm, 0, 0); gx.drawImage(sm, 0, 0); gx.filter = 'none';
   maskWith(under, grow);
+  { const ux2 = under.getContext('2d'); ux2.save(); ux2.globalCompositeOperation = 'destination-out'; ux2.setTransform(ts2, 0, 0, ts2, 0, 0); ux2.translate(-x0, -y0); ux2.beginPath(); f.poly.forEach((q, i) => i ? ux2.lineTo(q.x, q.y) : ux2.moveTo(q.x, q.y)); ux2.closePath(); ux2.fill(); ux2.restore(); }
   return { x0, y0, ts2, w, h, mask: sm, hair, under, W, H };
 }
 // the face halves get skin where hair lay across them, so the hair can leave
@@ -761,6 +778,10 @@ function inpaintCover(faceC, HM, f, ts, raw) {
   const w = faceC.width, h = faceC.height;
   const m = mk(w, h), mx = m.getContext('2d');
   mx.drawImage(HM.mask, (HM.x0 - f.minX) * ts, (HM.y0 - f.minY) * ts, HM.w * ts / HM.ts2, HM.h * ts / HM.ts2);
+  return inpaintMask(faceC, m, ts);
+}
+function inpaintMask(faceC, m, ts) {
+  const w = faceC.width, h = faceC.height;
   // fill the hair area from the surrounding skin: the face with the hair cut out, smeared inward at growing radii
   const holed = mk(w, h), hx = holed.getContext('2d'); hx.drawImage(faceC, 0, 0); hx.globalCompositeOperation = 'destination-out'; hx.drawImage(m, 0, 0); hx.drawImage(m, 0, 0);
   const sk = mk(w, h), skx = sk.getContext('2d');
@@ -771,6 +792,69 @@ function inpaintCover(faceC, HM, f, ts, raw) {
   return cover;
 }
 const HN = 36;
+// a simple face shape: an ellipsoid with a nose ridge
+function faceDepth(f, x, y) {
+  const W = f.maxX - f.minX, H = f.maxY - f.minY, cx = (f.minX + f.maxX) / 2, cy = (f.minY + f.maxY) / 2;
+  const ex = (x - cx) / (W * 0.52), ey = (y - cy) / (H * 0.55), q = 1 - ex * ex - ey * ey;
+  let d = q > 0 ? Math.sqrt(q) * 0.2 * W : 0;
+  const ny = f.noseY != null ? f.noseY : cy + 0.1 * H, top = ny - 0.32 * H;
+  if (y > top - 0.05 * H && y < ny + 0.08 * H) {
+    const k = clamp((y - top) / (ny - top), 0, 1), tail = y > ny ? Math.exp(-(((y - ny) / (0.03 * H)) ** 2)) : 1;
+    d += 0.09 * W * Math.exp(-(((x - f.spineX) / (0.065 * W)) ** 2)) * Math.pow(k, 0.8) * tail;
+  }
+  return d;
+}
+// eyes and mouth: only the parts that differ from skin (whites, irises, lashes, lips)
+function featureMask(f, faceC, ts) {
+  const w = faceC.width, h = faceC.height;
+  const rc = mk(w, h), rx = rc.getContext('2d', { willReadFrequently: true }); rx.drawImage(faceC, 0, 0);
+  const d = rx.getImageData(0, 0, w, h).data;
+  const T = (lx, ly) => [(lx - f.minX) * ts, (ly - f.minY) * ts];
+  let sr = 0, sg = 0, sb = 0, n = 0;
+  for (const q of f.skin) { const [x, y] = T(q.x, q.y); for (let dy = -3; dy <= 3; dy++) for (let dx = -3; dx <= 3; dx++) { const X = clamp(Math.round(x + dx * ts), 0, w - 1), Y = clamp(Math.round(y + dy * ts), 0, h - 1), i = (Y * w + X) * 4; sr += d[i]; sg += d[i + 1]; sb += d[i + 2]; n++; } }
+  sr /= n; sg /= n; sb /= n;
+  const parts = [[f.feats[0], f.demoHair ? 0.85 : 0.6, f.demoHair ? 1.0 : 0.7, 1], [f.feats[1], f.demoHair ? 0.85 : 0.6, f.demoHair ? 1.0 : 0.7, 1], [f.feats[4], f.demoHair ? 0.95 : 0.85, 0.9, 0]];
+  const mc = mk(w, h), mx = mc.getContext('2d'), out = mx.createImageData(w, h), o = out.data;
+  for (const [e, kx, ky, isEye] of parts) {
+    const [cx, cy] = T(e.x, e.y), ex = e.rx * ts * kx, ey = e.ry * ts * ky;
+    for (let y = Math.max(0, cy - ey | 0); y < Math.min(h, cy + ey + 1); y++) for (let x = Math.max(0, cx - ex | 0); x < Math.min(w, cx + ex + 1); x++) {
+      const q = ((x - cx) / ex) ** 2 + ((y - cy) / ey) ** 2; if (q >= 1) continue;
+      const i = (y * w + x) * 4, dr = d[i] - sr, dg = d[i + 1] - sg, db = d[i + 2] - sb;
+      const dist = Math.sqrt(0.35 * dr * dr + 0.45 * dg * dg + 0.2 * db * db) / 255;
+      // eyes: skip shaded eyelid skin (darker but same hue); mouth: lips differ in hue
+      const a = (1 - smooth(0.55, 1.0, q)) * (isEye && !f.demoHair ? smooth(0.12, 0.24, dist) : smooth(0.05, 0.14, dist));
+      o[i + 3] = Math.max(o[i + 3], a * 255);
+    }
+  }
+  mx.putImageData(out, 0, 0);
+  const sm = mk(w, h), sx = sm.getContext('2d'); sx.filter = `blur(${Math.max(0.8, ts * 0.8)}px)`; sx.drawImage(mc, 0, 0); sx.drawImage(mc, 0, 0);
+  return sm;
+}
+function createFeatures(b, featC, FM) {
+  const f = b.f, W = f.maxX - f.minX, H = f.maxY - f.minY;
+  const geo = new THREE.PlaneGeometry(W, H);
+  const mat = new THREE.ShaderMaterial({ uniforms: { ...U, front: { value: tex(featC) } }, vertexShader: VS, fragmentShader: FS_FRINGE, transparent: true, depthTest: false, depthWrite: false });
+  const mesh = new THREE.Mesh(geo, mat); mesh.frustumCulled = false; mesh.renderOrder = 19;
+  const soft = blurred(FM, Math.max(4, b.ts * 5));
+  const smat = new THREE.ShaderMaterial({ uniforms: { uImpact: U.uImpact, front: { value: tex(soft) }, strength: { value: 0 } }, vertexShader: VS, fragmentShader: FS_SHADOW, transparent: true, depthWrite: false, depthTest: false });
+  const shadow = new THREE.Mesh(new THREE.PlaneGeometry(W, H), smat); shadow.frustumCulled = false; shadow.renderOrder = 18;
+  const cx = (f.minX + f.maxX) / 2, cy = -(f.minY + f.maxY) / 2;
+  mesh.position.set(cx, cy, 6); shadow.position.set(cx, cy, 5);
+  b.group.add(shadow); b.group.add(mesh);
+  b.feat = { mesh, shadow, cx, cy, lift: 0, liftV: 0, launched: false, H };
+}
+function updateFeatures(b, t, dt, el, opening) {
+  const F = b.feat;
+  let lt = 0;
+  if (opening && el >= IMPACT_AT + 0.05) { lt = 1; if (!F.launched) { F.launched = true; F.liftV += 3; } }
+  const K = 40, C = 2 * (opening ? 0.45 : 0.8) * Math.sqrt(K), steps = Math.max(1, Math.ceil(dt / (1 / 240))), h = dt / steps;
+  for (let i = 0; i < steps; i++) { F.liftV += (K * (lt - F.lift) - C * F.liftV) * h; F.lift += F.liftV * h; }
+  // the expression stays where it was, floating a little above the open book
+  const bob = F.lift * Math.sin(t * 1.5) * F.H * 0.006;
+  F.mesh.position.set(F.cx, F.cy + bob, 6 + F.lift * F.H * 0.12);
+  F.shadow.position.set(F.cx + F.lift * F.H * 0.035, F.cy - F.lift * F.H * 0.05, 5);
+  F.shadow.material.uniforms.strength.value = 0.45 * clamp(F.lift, 0, 1);
+}
 function createHairLayer(b, HM) {
   const f = b.f, n = (HN + 1) * (HN + 1), lw = HM.w / HM.ts2, lh = HM.h / HM.ts2;
   const rest = new Float32Array(n * 2), uv = new Float32Array(n * 2), idx = [];
