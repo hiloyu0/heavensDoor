@@ -323,7 +323,7 @@ function endpaper(ctx, w, h, seed) {
 function avg(pts) { let x = 0, y = 0; for (const p of pts) { x += p.x; y += p.y; } return { x: x / pts.length, y: y / pts.length }; }
 function bbox(pts) { let minX = 1e9, maxX = -1e9, minY = 1e9, maxY = -1e9; for (const p of pts) { minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x); minY = Math.min(minY, p.y); maxY = Math.max(maxY, p.y); } return { minX, maxX, minY, maxY }; }
 function finishFrame(ox, oy, ang, poly, spineX, core) { return { ox, oy, ang, poly, spineX, ...bbox(poly), core: core || bbox(poly) }; }
-function frameFromLandmarks(pts) {
+function frameFromLandmarks(pts, ovalPts) {
   const le = avg(pts.slice(36, 42)), re = avg(pts.slice(42, 48));
   const ang = Math.atan2(re.y - le.y, re.x - le.x);
   const o = pts[27], c = Math.cos(-ang), s = Math.sin(-ang);
@@ -350,6 +350,11 @@ function frameFromLandmarks(pts) {
   }
   const spineX = avg([L[28], L[29], L[30], L[33], L[51], L[57]]).x;
   const core = bbox([...jaw, ...L.slice(17, 27), { x: cx, y: browY - 0.3 * (chinY - browY) }]);
+  if (ovalPts) {
+    // MediaPipe gives the real face outline (forehead included): use it, eased out a little at the jaw only
+    const oc = avg(ovalPts.map(p => ({ x: (p.x - o.x) * c - (p.y - o.y) * s, y: (p.x - o.x) * s + (p.y - o.y) * c })));
+    poly = ovalPts.map(p => { const q = { x: (p.x - o.x) * c - (p.y - o.y) * s, y: (p.x - o.x) * s + (p.y - o.y) * c }; const k = q.y > oc.y ? 1.05 : 1.0; return { x: oc.x + (q.x - oc.x) * k, y: oc.y + (q.y - oc.y) * k }; });
+  }
   for (let it = 0; it < 2; it++) { const q = []; for (let i = 0; i < poly.length; i++) { const a = poly[i], b2 = poly[(i + 1) % poly.length]; q.push({ x: a.x * 0.75 + b2.x * 0.25, y: a.y * 0.75 + b2.y * 0.25 }, { x: a.x * 0.25 + b2.x * 0.75, y: a.y * 0.25 + b2.y * 0.75 }); } poly = q; }
   // iron out landmark jitter and the kink where the jaw meets the forehead arc
   for (let it = 0; it < 6; it++) { const n = poly.length; poly = poly.map((p, i) => { const a = poly[(i - 1 + n) % n], c = poly[(i + 1) % n]; return { x: (a.x + 2 * p.x + c.x) / 4, y: (a.y + 2 * p.y + c.y) / 4 }; }); }
@@ -781,6 +786,7 @@ function hairMaskFor(f) {
   const mask = mk(w, h);
   const P = (lx, ly) => [(lx - x0) * ts2, (ly - y0) * ts2];
   if (f.demoHair && demoHairC) { toFrame(mask, demoHairC); }
+  else if (mpHairC) { toFrame(mask, mpHairC); }
   else {
     const d = ix.getImageData(0, 0, w, h).data;
     const fm = mk(w, h), fmx = fm.getContext('2d', { willReadFrequently: true }); fmx.fillStyle = '#000'; fmx.beginPath(); f.poly.forEach((q, i) => { const [x, y] = P(q.x, q.y); i ? fmx.lineTo(x, y) : fmx.moveTo(x, y); }); fmx.closePath(); fmx.fill();
@@ -1018,7 +1024,7 @@ function drawFx(t, dt) {
       lg.addColorStop(0, 'rgba(255,230,180,0)'); lg.addColorStop(clamp(ph - 0.15, 0, 1), 'rgba(255,230,180,0)'); lg.addColorStop(ph, `rgba(255,230,180,${0.35 + 0.3 * pul})`); lg.addColorStop(clamp(ph + 0.15, 0, 1), 'rgba(255,230,180,0)'); lg.addColorStop(1, 'rgba(255,230,180,0)');
       fxx.strokeStyle = lg; fxx.lineWidth = 2; fxx.shadowBlur = 8; fxx.beginPath(); fxx.moveTo(ax, ay); fxx.lineTo(bx2, by2); fxx.stroke();
       fxx.shadowBlur = 6; fxx.shadowColor = '#000'; fxx.font = `700 12px ${getComputedStyle(document.body).fontFamily}`; fxx.fillStyle = '#efe5cf';
-      fxx.fillText(fc.demo ? '見本の顔' : `顔 ${Math.round(fc.score * 100)}%`, corners[0][0], corners[0][1] - 9);
+      fxx.fillText(fc.demo ? '見本の顔' : fc.mp ? '顔 (MediaPipe)' : `顔 ${Math.round(fc.score * 100)}%`, corners[0][0], corners[0][1] - 9);
       fxx.restore();
     }
   }
@@ -1255,6 +1261,7 @@ function openAll() {
   books.forEach(disposeBook); books = [];
   { const c = mk(24, 24), x = c.getContext('2d', { willReadFrequently: true }); { const fr = faces[0].frame, hh = (fr.maxY - fr.minY) * 1.3; x.drawImage(src, fr.ox - hh / 2, fr.oy - hh / 2, hh, hh, 0, 0, 24, 24); } const d = x.getImageData(0, 0, 24, 24).data; let m = 0; for (let i = 0; i < d.length; i += 4) m += (0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2]) / 255; U.uThresh.value = clamp(m / 576 * 0.95, 0.28, 0.62); }
   dragOpen.L = dragOpen.R = 0;
+  if (mode !== 'demo') segmentHair(); else mpHairC = null;
   books = faces.map((fc, i) => createBook(fc, i));
   books.forEach(burst);
   fxState = { t0: now(), kind: 'open' };
@@ -1372,8 +1379,57 @@ $('#btnCam').addEventListener('click', async () => {
 });
 
 /* ---------- detection ---------- */
+/* MediaPipe Face Landmarker (478 points) and Hair Segmenter, hosted next to the page; face-api is the fallback */
+let mp = null;
+const MP68 = [162,234,93,58,172,136,149,148,152,377,378,365,397,288,323,454,389,71,63,105,66,107,336,296,334,293,301,168,197,5,4,75,97,2,326,305,33,160,158,133,153,144,362,385,387,263,373,380,61,39,37,0,267,269,291,405,314,17,84,181,78,82,13,312,308,317,14,87];
+const MP_OVAL = [10,338,297,332,284,251,389,356,454,323,361,288,397,365,379,378,400,377,152,148,176,149,150,136,172,58,132,93,234,127,162,21,54,103,67,109];
+async function loadMediaPipe() {
+  const abs = p => new URL(p, location.href).href;
+  const vis = await import(abs('mp/vision_bundle.mjs'));
+  const fileset = { wasmLoaderPath: abs('mp/vision_wasm_internal.js'), wasmBinaryPath: abs('mp/vision_wasm_internal.wasm') };
+  const buf = async p => { const r = await fetch(abs(p)); if (!r.ok) throw new Error(p); return new Uint8Array(await r.arrayBuffer()); };
+  const lm = await vis.FaceLandmarker.createFromOptions(fileset, { baseOptions: { modelAssetBuffer: await buf('mp/face_landmarker.wasm'), delegate: 'CPU' }, runningMode: 'IMAGE', numFaces: 4, outputFaceBlendshapes: true });
+  let seg = null;
+  try { seg = await vis.ImageSegmenter.createFromOptions(fileset, { baseOptions: { modelAssetBuffer: await buf('mp/hair_segmenter.wasm'), delegate: 'CPU' }, runningMode: 'IMAGE', outputCategoryMask: false, outputConfidenceMasks: true }); } catch (e) { seg = null; }
+  mp = { lm, seg };
+}
+function moodFromBlend(cats) {
+  const g = n => { const c = cats.find(c => c.categoryName === n); return c ? c.score : 0; };
+  if ((g('mouthSmileLeft') + g('mouthSmileRight')) / 2 > 0.35) return 'happy';
+  if (g('jawOpen') > 0.45 && (g('browInnerUp') > 0.3 || g('eyeWideLeft') > 0.3)) return 'surprised';
+  if ((g('browDownLeft') + g('browDownRight')) / 2 > 0.4) return 'angry';
+  if ((g('mouthFrownLeft') + g('mouthFrownRight')) / 2 > 0.3) return 'sad';
+  return 'neutral';
+}
+function detectMediaPipe() {
+  const res = mp.lm.detect(src), W = src.width, H = src.height;
+  return (res.faceLandmarks || []).map((lmk, i) => {
+    const P = j => ({ x: lmk[j].x * W, y: lmk[j].y * H });
+    const pts68 = MP68.map(P), oval = MP_OVAL.map(P);
+    const blend = res.faceBlendshapes && res.faceBlendshapes[i] ? res.faceBlendshapes[i].categories : [];
+    return { frame: frameFromLandmarks(pts68, oval), score: 0.99, expr: moodFromBlend(blend), mp: true };
+  }).sort((a, b) => (b.frame.maxX - b.frame.minX) - (a.frame.maxX - a.frame.minX)).slice(0, 4);
+}
+// hair probability over the whole picture, as an alpha canvas the hair code can sample
+let mpHairC = null;
+function segmentHair() {
+  mpHairC = null;
+  if (!mp || !mp.seg) return;
+  try {
+    const r = mp.seg.segment(src), cm = r.confidenceMasks; if (!cm || !cm.length) return;
+    const m = cm[cm.length > 1 ? 1 : 0], w = m.width, h = m.height, d = m.getAsFloat32Array();
+    const c = mk(w, h), x = c.getContext('2d'), img = x.createImageData(w, h);
+    for (let i = 0; i < d.length; i++) img.data[i * 4 + 3] = 255 * smooth(0.35, 0.75, d[i]);
+    x.putImageData(img, 0, 0);
+    mpHairC = mk(src.width, src.height); mpHairC.getContext('2d').drawImage(c, 0, 0, src.width, src.height);
+    if (r.close) r.close(); cm.forEach(q => q.close && q.close());
+  } catch (e) { mpHairC = null; }
+}
 const MODEL_BASES = ['model', 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.13/model'];
 async function loadModels() {
+  pill('モデル読み込み中', 'busy');
+  try { await loadMediaPipe(); modelsReady = true; pill(mode === 'demo' ? '見本の顔' : '準備完了 (MediaPipe)', 'ok'); if (pendingImage) { pendingImage = false; detectNow(512); } return; }
+  catch (e) { mp = null; /* fall back to face-api */ }
   if (!window.faceapi) { pill('顔認識なし', ''); msg('顔認識ライブラリを読み込めませんでした。見本の顔だけ使えます。'); return; }
   pill('モデル読み込み中', 'busy');
   for (const base of MODEL_BASES) {
@@ -1395,10 +1451,14 @@ async function detectNow(size) {
   if (detecting) { detectAgain = size; return; }
   detecting = true; const gen = srcGen;
   try {
-    const opts = new faceapi.TinyFaceDetectorOptions({ inputSize: size, scoreThreshold: 0.45 });
-    const res = await faceapi.detectAllFaces(src, opts).withFaceLandmarks(true).withFaceExpressions();
-    const found = res.sort((a, b) => b.detection.box.area - a.detection.box.area).slice(0, 4)
-      .map(r => ({ frame: frameFromLandmarks(r.landmarks.positions), score: r.detection.score, expr: topExpr(r.expressions) }));
+    let found;
+    if (mp) found = detectMediaPipe();
+    else {
+      const opts = new faceapi.TinyFaceDetectorOptions({ inputSize: size, scoreThreshold: 0.45 });
+      const res = await faceapi.detectAllFaces(src, opts).withFaceLandmarks(true).withFaceExpressions();
+      found = res.sort((a, b) => b.detection.box.area - a.detection.box.area).slice(0, 4)
+        .map(r => ({ frame: frameFromLandmarks(r.landmarks.positions), score: r.detection.score, expr: topExpr(r.expressions) }));
+    }
     if (gen !== srcGen) { detecting = false; const s2 = detectAgain || size; detectAgain = 0; return detectNow(s2); }
     if (!frozen) faces = found;
     const n = faces.length;
