@@ -340,6 +340,7 @@ function frameFromLandmarks(pts) {
   poly = poly.map(p => ({ x: mx + (p.x - mx) * 1.11, y: my + (p.y - my) * 1.05 }));
   const spineX = avg([L[28], L[29], L[30], L[33], L[51], L[57]]).x;
   const core = bbox([...jaw, ...L.slice(17, 27), { x: cx, y: browY - 0.3 * (chinY - browY) }]);
+  for (let it = 0; it < 2; it++) { const q = []; for (let i = 0; i < poly.length; i++) { const a = poly[i], b2 = poly[(i + 1) % poly.length]; q.push({ x: a.x * 0.75 + b2.x * 0.25, y: a.y * 0.75 + b2.y * 0.25 }, { x: a.x * 0.25 + b2.x * 0.75, y: a.y * 0.25 + b2.y * 0.75 }); } poly = q; }
   const fr = finishFrame(o.x, o.y, ang, poly, spineX, core);
   const ell = (q, k) => { const bb = bbox(q), rx2 = Math.max(4, (bb.maxX - bb.minX) / 2 * k); return { x: (bb.minX + bb.maxX) / 2, y: (bb.minY + bb.maxY) / 2, rx: rx2, ry: Math.max(rx2 * 0.55, (bb.maxY - bb.minY) / 2 * k) }; };
   fr.feats = [ell(L.slice(36, 42), 1.8), ell(L.slice(42, 48), 1.8), ell(L.slice(17, 22), 1.2), ell(L.slice(22, 27), 1.2), ell(L.slice(48, 60), 1.35), ell(L.slice(31, 36), 1.5)];
@@ -561,7 +562,7 @@ function createBook(face, idx) {
   const rimF = rimOf(mf, Math.max(3, ts * 3), 'rgba(110,78,50,0.45)');
   const box = { left: w * 0.05, right: w * 0.95, top: 0, bottom: h };
   // the cut edge around each hole: a bright paper edge
-  const cutEdge = (c, flip) => { const x = c.getContext('2d'); x.save(); x.globalCompositeOperation = 'source-atop'; x.strokeStyle = 'rgba(255,248,232,0.95)'; x.lineWidth = Math.max(1.5, ts * 1.8); drawHoles(x, holes, f, ts, flip ? w : 0, 1.04, hf.sx); x.stroke(); x.strokeStyle = 'rgba(90,60,40,0.35)'; x.lineWidth = Math.max(1, ts); drawHoles(x, holes, f, ts, flip ? w : 0, 1.12, hf.sx); x.stroke(); x.restore(); };
+  const cutEdge = (c, flip) => { const x = c.getContext('2d'); x.save(); x.globalCompositeOperation = 'source-atop'; x.strokeStyle = 'rgba(255,248,232,0.95)'; x.lineWidth = Math.max(1.5, ts * 1.8); drawHoles(x, holes, f, ts, flip ? w : 0, 1.04, hf.sx); x.stroke(); x.strokeStyle = 'rgba(90,60,40,0.18)'; x.lineWidth = Math.max(1, ts * 0.7); drawHoles(x, holes, f, ts, flip ? w : 0, 1.1, hf.sx); x.stroke(); x.restore(); };
   for (let k = 0; k <= NPAGES; k++) {
     const isCover = k === NPAGES;
     let front, back = mk(w, h); const bx = back.getContext('2d');
@@ -572,7 +573,7 @@ function createBook(face, idx) {
       maskWith(front, m); atop(front, rim); cutEdge(front, false);
     }
     paper(bx, w, h, seed + k * 17 + 5 + hf.side, (k + 1) % 2);
-    vText(bx, pick(double ? 3 : 4), box, fsz * (0.9 + r() * 0.2), 'rgba(40,28,30,0.85)', seed + k * 13 + hf.side, null, Bf);
+    vText(bx, pick(double ? 5 : 8), box, fsz * (0.85 + r() * 0.15), 'rgba(28,20,24,0.95)', seed + k * 13 + hf.side, null, Bf);
     maskWith(back, mf); atop(back, rimF); cutEdge(back, true);
     const geom = pageGeom(hf.side), sgeom = new THREE.BufferGeometry();
     sgeom.setIndex(geom.getIndex()); sgeom.setAttribute('uv', geom.attributes.uv);
@@ -587,7 +588,7 @@ function createBook(face, idx) {
     const L = double ? (hf.side > 0 ? f.maxX - f.spineX : f.spineX - f.minX) : W;
     const p = { mesh, geom, smesh, sgeom, side: hf.side, k, isCover, L, hx: hf.side > 0 ? f.maxX : f.minX, zOff: (k + 1) * 0.8,
       sx: isCover ? 1 : 1 - (NPAGES - k) * 0.01 + (r() - .5) * 0.02, sy: isCover ? 1 : 1 - (NPAGES - k) * 0.006 + (r() - .5) * 0.015,
-      target: isCover ? 2.62 + (r() - .5) * 0.06 : 1.5 + k * 0.2 + (r() - .5) * 0.06,
+      target: isCover ? 2.86 + (r() - .5) * 0.03 : 2.5 + k * 0.07 + (r() - .5) * 0.03,
       delay: (isCover ? 0.26 : 0.36 + [0, 0.05, 0.09, 0.125, 0.155][NPAGES - 1 - k]) + (hf.side > 0 ? 0.015 : 0),
       K: isCover ? 120 : 80 + r() * 60, zeta: isCover ? 0.5 : 0.34 + r() * 0.14,
       theta: 0, vel: 0, bend: 0, wave: 0, phase: r() * 6.28, launched: false };
@@ -635,12 +636,13 @@ function renderBase(b, reveal) {
   const c = b.baseC, x = c.getContext('2d'), w = c.width, h = c.height, f = b.f, ts = b.ts;
   x.save(); x.clearRect(0, 0, w, h);
   // the skin keeps only its light and shade, printed on paper; the eyes, nostrils and mouth keep their colour
-  x.filter = 'grayscale(1) brightness(1.25) contrast(1.15)'; x.drawImage(b.faceSrc, 0, 0); x.filter = 'none';
+  x.fillStyle = '#efe6d2'; x.fillRect(0, 0, w, h);
+  x.globalAlpha = 0.85; x.filter = 'grayscale(1) contrast(0.55) brightness(1.35)'; x.drawImage(b.faceSrc, 0, 0); x.filter = 'none'; x.globalAlpha = 1;
   const fsz = h * 0.036;
   const mood = MOOD[b.face.expr] || 'ふつう';
   const no = String(((b.seed % 9000) + 1000)).replace(/\d/g, d => '〇一二三四五六七八九'[d]);
   const pc = mk(w, h), px = pc.getContext('2d'); paper(px, w, h, b.seed + 99, 1);
-  vText(px, [{ t: `記録　第${no}号`, s: 1.15, c: '#2a1a1e' }, { t: `いまの気分　${mood}`, c: '#5a3a2a' }, ...b.lines], { left: w * 0.03, right: w * 0.97, top: 0, bottom: h }, fsz, 'rgba(30,22,26,0.88)', b.seed + 1, null, b.Bfull);
+  vText(px, [{ t: `記録　第${no}号`, s: 1.15, c: '#2a1a1e' }, { t: `いまの気分　${mood}`, c: '#5a3a2a' }, ...b.lines], { left: w * 0.03, right: w * 0.97, top: 0, bottom: h }, fsz, 'rgba(22,16,20,0.97)', b.seed + 1, null, b.Bfull);
   px.globalCompositeOperation = 'destination-out'; px.drawImage(b.holesC, 0, 0);
   // skin turns to printed paper but keeps the face's own shading
   x.globalCompositeOperation = 'multiply'; x.drawImage(pc, 0, 0);
@@ -681,7 +683,7 @@ function updateBook(b, t, dt) {
         let target = p.target;
         // dragging spreads that side further, up to lying almost flat outward
         const dd = p.side < 0 ? dragOpen.L : dragOpen.R;
-        if (dd > 0) { const maxT = p.isCover ? 2.95 : 1.75 + p.k * 0.24; target += (maxT - target) * dd; }
+        if (dd > 0) { const maxT = p.isCover ? 3.02 : 2.75 + p.k * 0.05; target += (maxT - target) * dd; }
         p.eff = target;
         tgt = target + (el > p.delay + 1.2 ? (p.isCover ? 0.015 : target < 0.2 ? 0.01 : 0.045) * Math.sin(t * 1.7 + p.phase) : 0);
       }
@@ -700,7 +702,8 @@ function updateBook(b, t, dt) {
     // curl follows speed: the free edge trails behind the hinge
     p.bend = clamp(p.vel * 0.075, -0.75, 0.75) + 0.12 * clamp(p.theta / 0.8, 0, 1) ; if (!p.isCover) p.bend += 0.32 * clamp(p.theta / 0.6, 0, 1);
     p.wave = clamp(Math.abs(p.vel) * 3.2, 0, 22) * (p.isCover ? 0.5 : 1) + (el > p.delay + 1.2 && opening ? 2.5 * Math.sin(t * 2.3 + p.phase) : 0);
-    const settledFlat = opening && !p.isCover && p.k < NPAGES - 1 && el > p.delay + 1.0 && p.theta < 0.3;
+    const hiddenOnClose = !opening && !p.isCover && b.pages.some(q => q.isCover && q.theta < 0.35);
+    const settledFlat = hiddenOnClose || opening && !p.isCover && p.k < NPAGES - 1 && el > p.delay + 1.0 && p.theta < 0.3;
     p.mesh.visible = p.smesh.visible = !settledFlat && (p.isCover || p.theta > 0.002 || (opening && el > p.delay - 0.03));
     p.rel = p.isCover ? clamp(p.theta / 0.6, 0, 1) : 0;
     p.mesh.material.uniforms.lift.value = clamp(p.theta / 0.9, 0, 1);
