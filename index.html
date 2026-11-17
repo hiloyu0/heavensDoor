@@ -162,7 +162,7 @@ vec3 gradeCol(vec3 c, float amt, float tone, vec2 wp){
   float l = dot(c, vec3(0.299, 0.587, 0.114));
   // keep strongly coloured details (eyes, lips) in colour
   float mxc = max(c.r, max(c.g, c.b)), mnc = min(c.r, min(c.g, c.b));
-  amt *= 1.0 - 0.65 * smoothstep(0.3, 0.65, (mxc - mnc) / (mxc + 0.001)) * smoothstep(0.08, 0.25, mxc);
+  amt *= 1.0 - 0.45 * smoothstep(0.3, 0.65, (mxc - mnc) / (mxc + 0.001)) * smoothstep(0.08, 0.25, mxc);
   vec3 sep = vec3(l * 1.08 + 0.02, l * 0.96 + 0.005, l * 0.80);
   vec3 g = mix(c, mix(vec3(l), sep, 0.6), 0.85 * amt);
   g = (g - 0.5) * (1.0 + 0.32 * amt) + 0.5;
@@ -635,7 +635,7 @@ function createBook(face, idx) {
   gx.setTransform(1, 0, 0, 2, 0, 0); gx.fillStyle = gg; gx.fillRect(0, 0, 128, 128);
   const glow = new THREE.Mesh(new THREE.PlaneGeometry(W * 0.8, H * 0.9), new THREE.MeshBasicMaterial({ map: tex(gc), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, opacity: 0 }));
   glow.position.set(openMode === 'double' ? f.spineX : (singleSide < 0 ? f.minX + W * 0.15 : f.maxX - W * 0.15), -(f.minY + f.maxY) / 2, 0.5); glow.renderOrder = 2.5; group.add(glow);
-  const book = { face, f, group, pages, base, baseC, raw, faceSrc: coverSrc, faceOrig: faceC, fit: 1, hairFM, singleSide, holesC, Bfull, ts, mode: openMode, spP, seed, glow, lines: pick(9), state: 'opening', t0: now(), inkT: 0, inkShown: -1, idx, inkPage: null, inkPen: null };
+  const book = { face, f, group, pages, base, baseC, raw, faceSrc: coverSrc, faceOrig: faceC, fit: 1, hairFM, singleSide, holesC, Bfull, ts, mode: openMode, spP, seed, glow, lines: pick(18), state: 'opening', t0: now(), inkT: 0, inkShown: -1, idx, inkPage: null, inkPen: null };
   renderBase(book, 0);
   if (HM) createHairLayer(book, HM);
   scene.add(group); placeBook(book);
@@ -667,11 +667,11 @@ function renderBase(b, reveal) {
   // the skin keeps only its light and shade, printed on paper; the eyes, nostrils and mouth keep their colour
   x.fillStyle = '#eee8dc'; x.fillRect(0, 0, w, h);
   x.globalCompositeOperation = 'multiply'; x.globalAlpha = 0.45; x.filter = 'grayscale(1) contrast(0.75) brightness(1.35)'; x.drawImage(b.faceSrc, 0, 0); x.filter = 'none'; x.globalAlpha = 1; x.globalCompositeOperation = 'source-over';
-  const fsz = h * 0.036;
+  const fsz = h * 0.031;
   const mood = MOOD[b.face.expr] || 'ふつう';
   const no = String(((b.seed % 9000) + 1000)).replace(/\d/g, d => '〇一二三四五六七八九'[d]);
   const pc = mk(w, h), px = pc.getContext('2d'); paper(px, w, h, b.seed + 99, 1);
-  vText(px, [{ t: `記録　第${no}号`, s: 1.15, c: '#2a1a1e' }, { t: `いまの気分　${mood}`, c: '#5a3a2a' }, ...b.lines], { left: w * 0.03, right: w * 0.97, top: 0, bottom: h }, fsz, 'rgba(22,16,20,0.97)', b.seed + 1, null, b.Bfull);
+  vText(px, [{ t: `記録　第${no}号`, s: 1.15, c: '#2a1a1e' }, { t: `いまの気分　${mood}`, c: '#5a3a2a' }, { t: b.lines.join('。') + '。' + b.lines.slice().reverse().join('。') }], { left: w * 0.03, right: w * 0.97, top: 0, bottom: h }, fsz, 'rgba(22,16,20,0.97)', b.seed + 1, null, b.Bfull);
   px.globalCompositeOperation = 'destination-out'; px.drawImage(b.holesC, 0, 0);
   // skin turns to printed paper but keeps the face's own shading
   x.globalCompositeOperation = 'multiply'; x.drawImage(pc, 0, 0); x.globalCompositeOperation = 'source-over';
@@ -684,9 +684,9 @@ function renderBase(b, reveal) {
   if (b.recessOn) {
     const hs = holeShapes(f);
     x.save(); drawHoles(x, hs, f, ts); x.clip();
-    x.filter = `blur(${ts * 2}px)`; x.strokeStyle = 'rgba(25,14,16,0.6)'; x.lineWidth = ts * 4; x.translate(0, ts * 2.5); drawHoles(x, hs, f, ts, 0, 1.05); x.stroke();
+    x.filter = `blur(${ts * 2}px)`; x.strokeStyle = 'rgba(25,14,16,0.42)'; x.lineWidth = ts * 2.5; x.translate(0, ts * 2.5); drawHoles(x, hs, f, ts, 0, 1.05); x.stroke();
     x.restore();
-    x.save(); x.fillStyle = 'rgba(40,22,20,0.75)'; x.filter = `blur(${ts * 0.8}px)`; drawHoles(x, hs.slice(3), f, ts, 0, 0.8); x.fill(); x.restore();
+    x.save(); x.fillStyle = f.demoHair ? 'rgba(80,45,40,0.3)' : 'rgba(40,22,20,0.6)'; x.filter = `blur(${ts * 0.8}px)`; drawHoles(x, hs.slice(3), f, ts, 0, 0.8); x.fill(); x.restore();
     x.save(); x.strokeStyle = 'rgba(255,248,232,0.6)'; x.lineWidth = Math.max(1, ts * 0.8); x.beginPath();
     for (const hlo of hs) { const cx = (hlo.x - f.minX) * ts, cy = (hlo.y - f.minY) * ts; x.moveTo(cx + hlo.rx * ts * 1.02 * Math.cos(0.4), cy + hlo.ry * ts * 1.02 * Math.sin(0.4)); x.ellipse(cx, cy, hlo.rx * ts * 1.02, hlo.ry * ts * 1.02, 0, 0.4, Math.PI - 0.4); }
     x.stroke(); x.restore();
@@ -764,8 +764,8 @@ function updateBook(b, t, dt) {
   if (opening && el > 0.8 && b.mode !== 'double') {
     // keep every page's free edge inside the picture with a margin
     const mg = Math.min(dispW, dispH) * 0.05; let out = false, roomy = true;
-    for (const p of b.pages) { if (!p.mesh.visible) continue; for (const row of [0, ROWS >> 1, ROWS]) {
-      const a = p.geom.attributes.position.array, k = (row * (COLS + 1) + COLS) * 3; v3.set(a[k], a[k + 1], a[k + 2]); b.group.localToWorld(v3); v3.project(camera);
+    for (const p of b.pages) { if (!p.mesh.visible) continue; for (const row of [0, ROWS >> 1, ROWS]) for (const col of [COLS >> 1, COLS]) {
+      const a = p.geom.attributes.position.array, k = (row * (COLS + 1) + col) * 3; v3.set(a[k], a[k + 1], a[k + 2]); b.group.localToWorld(v3); v3.project(camera);
       const sx = (v3.x + 1) / 2 * dispW, sy = (1 - v3.y) / 2 * dispH;
       if (sx < mg || sx > dispW - mg || sy < mg || sy > dispH - mg) out = true;
       if (sx < mg * 2.5 || sx > dispW - mg * 2.5 || sy < mg * 2.5 || sy > dispH - mg * 2.5) roomy = false; } }
@@ -943,7 +943,7 @@ function createHairLayer(b, HM) {
     const mat = new THREE.ShaderMaterial({ uniforms: { ...U, front: { value: tex(canvas) } }, vertexShader: VS, fragmentShader: FS_FRINGE, transparent: true, depthTest: false, depthWrite: false });
     const mesh = new THREE.Mesh(g, mat); mesh.frustumCulled = false; mesh.renderOrder = order; b.group.add(mesh); return { mesh, geom: g };
   };
-  const under = mkMesh(HM.under, 0.3, 0.1);
+  const under = mkMesh(HM.under, 0.3, 0.1); under.mesh.visible = false;
   const layer = mkMesh(HM.hair, 20, 6);
   layer.mesh.material.depthTest = true;
   // the scalp: roots stay put along this arc; strands hang from it
@@ -990,7 +990,7 @@ function scrap(x, y, vx, vy, delay, big) {
 }
 function burst(b) {
   const f = b.f, r = Math.random;
-  for (let i = 0; i < 20; i++) {
+  for (let i = 0; i < 12; i++) {
     const ly = f.minY + r() * (f.maxY - f.minY);
     const [x, y] = toDisp(f, b.mode === 'double' ? f.spineX : (b.singleSide < 0 ? f.maxX - (f.maxX - f.minX) * 0.06 : f.minX + (f.maxX - f.minX) * 0.06), ly);
     const a = (r() < .5 ? Math.PI : 0) + (r() - .5) * 1.2 + f.ang, sp = 200 + r() * 600;
@@ -1066,10 +1066,10 @@ function drawFx(t, dt) {
           const a = impact ? 1 : Math.pow(clamp(1 - (e - IMPACT_AT - IMPACT_LEN) / 0.42, 0, 1), 2);
           const r = rng(((t * 12) | 0) + b.idx * 99);
           fxx.save();
-          for (let i = 0; i < (impact ? 150 : 64); i++) {
+          for (let i = 0; i < (impact ? 120 : 38); i++) {
             const an = r() * Math.PI * 2, wd = (impact ? 0.006 : 0.003) + r() * (impact ? 0.02 : 0.012), r0 = fr * ((impact ? 1.35 : 1.65) + r() * 0.9 + (e - IMPACT_AT) * 0.5);
             const below = Math.sin(an) > 0.35 ? 0.35 : 1;
-            fxx.fillStyle = impact ? '#140b18' : `rgba(15,8,20,${0.6 * a * below})`;
+            fxx.fillStyle = impact ? '#140b18' : `rgba(15,8,20,${0.42 * a * below})`;
             fxx.beginPath(); fxx.moveTo(cx + Math.cos(an - wd) * R, cy + Math.sin(an - wd) * R); fxx.lineTo(cx + Math.cos(an) * r0, cy + Math.sin(an) * r0); fxx.lineTo(cx + Math.cos(an + wd) * R, cy + Math.sin(an + wd) * R); fxx.fill();
           }
           fxx.restore();
