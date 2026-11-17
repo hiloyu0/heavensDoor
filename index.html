@@ -552,7 +552,11 @@ function createBook(face, idx) {
   const pages = [];
   const group = new THREE.Group();
   const double = openMode === 'double';
-  const halves = double ? [{ side: -1, sx: 0, sw: spP }, { side: 1, sx: spP, sw: Wp - spP }] : [{ side: -1, sx: 0, sw: Wp }];
+  const ca = Math.cos(f.ang), roomL = f.ox + ca * f.minX, roomR = src.width - (f.ox + ca * f.maxX);
+  const singleSide = roomL >= roomR ? -1 : 1, room = Math.max(roomL, roomR);
+  // how far the face sheet may lie over before it would leave the picture
+  const coverT = clamp(Math.acos(clamp(-room / (W * 1.05), -0.96, 0.2)), 1.9, 2.86);
+  const halves = double ? [{ side: -1, sx: 0, sw: spP }, { side: 1, sx: spP, sw: Wp - spP }] : [{ side: singleSide, sx: 0, sw: Wp }];
   const Bfull = boundsOf(raw);
   for (const hf of halves) {
   const w = hf.sw, h = Hp, m = crop(maskC, hf.sx, hf.sw), mf = crop(maskC, hf.sx, hf.sw, true);
@@ -588,7 +592,8 @@ function createBook(face, idx) {
     const L = double ? (hf.side > 0 ? f.maxX - f.spineX : f.spineX - f.minX) : W;
     const p = { mesh, geom, smesh, sgeom, side: hf.side, k, isCover, L, hx: hf.side > 0 ? f.maxX : f.minX, zOff: (k + 1) * 0.8,
       sx: isCover ? 1 : 1 - (NPAGES - k) * 0.01 + (r() - .5) * 0.02, sy: isCover ? 1 : 1 - (NPAGES - k) * 0.006 + (r() - .5) * 0.015,
-      target: isCover ? 2.86 + (r() - .5) * 0.03 : 2.5 + k * 0.07 + (r() - .5) * 0.03,
+      target: isCover ? (double ? 2.86 : coverT) : (double ? 2.86 : coverT) - (NPAGES - k) * 0.21 + (r() - .5) * 0.04,
+      curl: 0.22 + r() * 0.32,
       delay: (isCover ? 0.26 : 0.36 + [0, 0.05, 0.09, 0.125, 0.155][NPAGES - 1 - k]) + (hf.side > 0 ? 0.015 : 0),
       K: isCover ? 120 : 80 + r() * 60, zeta: isCover ? 0.5 : 0.34 + r() * 0.14,
       theta: 0, vel: 0, bend: 0, wave: 0, phase: r() * 6.28, launched: false };
@@ -605,8 +610,8 @@ function createBook(face, idx) {
   gg.addColorStop(0, 'rgba(255,214,140,0.6)'); gg.addColorStop(1, 'rgba(255,150,60,0)');
   gx.setTransform(1, 0, 0, 2, 0, 0); gx.fillStyle = gg; gx.fillRect(0, 0, 128, 128);
   const glow = new THREE.Mesh(new THREE.PlaneGeometry(W * 0.8, H * 0.9), new THREE.MeshBasicMaterial({ map: tex(gc), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, opacity: 0 }));
-  glow.position.set(openMode === 'double' ? f.spineX : f.minX + W * 0.15, -(f.minY + f.maxY) / 2, 0.5); glow.renderOrder = 2.5; group.add(glow);
-  const book = { face, f, group, pages, base, baseC, raw, faceSrc: coverSrc, faceOrig: faceC, holesC, Bfull, ts, mode: openMode, spP, seed, glow, lines: pick(9), state: 'opening', t0: now(), inkT: 0, inkShown: -1, idx, inkPage: null, inkPen: null };
+  glow.position.set(openMode === 'double' ? f.spineX : (singleSide < 0 ? f.minX + W * 0.15 : f.maxX - W * 0.15), -(f.minY + f.maxY) / 2, 0.5); glow.renderOrder = 2.5; group.add(glow);
+  const book = { face, f, group, pages, base, baseC, raw, faceSrc: coverSrc, faceOrig: faceC, singleSide, holesC, Bfull, ts, mode: openMode, spP, seed, glow, lines: pick(9), state: 'opening', t0: now(), inkT: 0, inkShown: -1, idx, inkPage: null, inkPen: null };
   renderBase(book, 0);
   if (HM) createHairLayer(book, HM);
   scene.add(group); placeBook(book);
@@ -701,9 +706,9 @@ function updateBook(b, t, dt) {
       if (!opening && p.theta < 0) { p.theta = 0; p.vel = -p.vel * 0.22; }
     }
     // curl follows speed: the free edge trails behind the hinge
-    p.bend = clamp(p.vel * 0.075, -0.75, 0.75) + 0.12 * clamp(p.theta / 0.8, 0, 1) ; if (!p.isCover) p.bend += 0.32 * clamp(p.theta / 0.6, 0, 1);
+    p.bend = clamp(p.vel * 0.075, -0.75, 0.75) + 0.12 * clamp(p.theta / 0.8, 0, 1) ; if (!p.isCover) p.bend += p.curl * clamp(p.theta / 0.6, 0, 1);
     p.wave = clamp(Math.abs(p.vel) * 3.2, 0, 22) * (p.isCover ? 0.5 : 1) + (el > p.delay + 1.2 && opening ? 2.5 * Math.sin(t * 2.3 + p.phase) : 0);
-    const hiddenOnClose = !opening && !p.isCover && b.pages.some(q => q.isCover && q.theta < 0.35);
+    const hiddenOnClose = !opening && !p.isCover && b.pages.some(q => q.isCover && q.side === p.side && q.theta < 0.35);
     const settledFlat = hiddenOnClose || opening && !p.isCover && p.k < NPAGES - 1 && el > p.delay + 1.0 && p.theta < 0.3;
     p.mesh.visible = p.smesh.visible = !settledFlat && (p.isCover || p.theta > 0.002 || (opening && el > p.delay - 0.03));
     p.rel = p.isCover ? clamp(p.theta / 0.6, 0, 1) : 0;
@@ -737,7 +742,7 @@ let openMode = 'single';
 // hair region in the face's upright frame, sampled at ts2 px per local unit
 function hairMaskFor(f) {
   const W = f.maxX - f.minX, H = f.maxY - f.minY;
-  const x0 = f.minX - 0.85 * W, x1 = f.maxX + 0.85 * W, y0 = f.minY - 0.65 * H, y1 = f.maxY + 0.75 * H;
+  const x0 = f.minX - 0.9 * W, x1 = f.maxX + 0.9 * W, y0 = f.minY - 0.7 * H, y1 = f.maxY + 1.3 * H;
   const ts2 = Math.min(1.6, 560 / Math.max(x1 - x0, y1 - y0)), w = Math.round((x1 - x0) * ts2), h = Math.round((y1 - y0) * ts2);
   const toFrame = (c, source) => { const x = c.getContext('2d', { willReadFrequently: true }); x.setTransform(ts2, 0, 0, ts2, 0, 0); x.translate(-x0, -y0); x.rotate(-f.ang); x.translate(-f.ox, -f.oy); x.drawImage(source, 0, 0); x.setTransform(1, 0, 0, 1, 0, 0); return x; };
   const img = mk(w, h); const ix = toFrame(img, src);
@@ -784,7 +789,9 @@ function hairMaskFor(f) {
   }
   // soften, then firm up the edge
   const sm = mk(w, h), sx = sm.getContext('2d', { willReadFrequently: true }); sx.filter = `blur(${Math.max(1.2, ts2 * 1.6)}px)`; sx.drawImage(mask, 0, 0); sx.filter = 'none';
-  const sd = sx.getImageData(0, 0, w, h); for (let i = 3; i < sd.data.length; i += 4) sd.data[i] = 255 * smooth(0.25, 0.6, sd.data[i] / 255); sx.putImageData(sd, 0, 0);
+  const sd = sx.getImageData(0, 0, w, h), edgeW = Math.max(8, Math.min(w, h) * 0.06);
+  for (let i = 3; i < sd.data.length; i += 4) { const k = (i - 3) / 4, px = k % w, py = (k / w) | 0, fade = smooth(0, edgeW, Math.min(px, py, w - 1 - px, h - 1 - py)); sd.data[i] = 255 * smooth(0.25, 0.6, sd.data[i] / 255) * fade; }
+  sx.putImageData(sd, 0, 0);
   const hair = mk(w, h); hair.getContext('2d').drawImage(img, 0, 0); maskWith(hair, sm);
   // what shows where the hair has moved away: a soft blur of the surroundings
   const under = mk(w, h), ux = under.getContext('2d'); ux.filter = `blur(${Math.max(4, ts2 * 9)}px)`; ux.drawImage(img, 0, 0); ux.filter = 'none';
@@ -895,7 +902,7 @@ function createHairLayer(b, HM) {
   // the scalp: roots stay put along this arc; strands hang from it
   const cx = f.spineX, cy = (f.minY + f.maxY) / 2 - 0.05 * HM.H, rx = 0.62 * HM.W, top = f.minY - 0.3 * HM.H;
   const rootY = x => { const u = (x - cx) / rx; return Math.abs(u) < 1 ? cy - (cy - top) * Math.sqrt(1 - u * u) : cy; };
-  b.hairL = { layer, under, rest, n, rootY, cx, W: HM.W, H: HM.H, phi: 0, phiV: 0, lift: 0, liftV: 0, launched: false };
+  b.hairL = { layer, under, rest, n, rootY, cx, fy: (f.minY + f.maxY) / 2, W: HM.W, H: HM.H, phi: 0, phiV: 0, lift: 0, liftV: 0, launched: false };
 }
 function bendHairLayer(b, t) {
   const L = b.hairL, pos = L.layer.geom.attributes.position.array;
@@ -905,7 +912,9 @@ function bendHairLayer(b, t) {
     if (w <= 0) { pos[k * 3] = x; pos[k * 3 + 1] = -y; pos[k * 3 + 2] = 6; continue; }
     const s = Math.tanh((x - L.cx) / (0.1 * L.W));
     // each strand swings from its own root: the parting pushes the two sides apart, a wave runs down to the tips
-    const a = -s * L.phi * w + L.lift * w * (0.09 * Math.sin(t * 2.1 - w * 3.2 + x * 0.012) + 0.035 * Math.sin(t * 3.7 + x * 0.03));
+    // hair lying on the face stays close to it; only hair outside the face swings freely
+    const ex = (x - L.cx) / (L.W * 0.55), ey = (y - (L.fy)) / (L.H * 0.55), onFace = smooth(1.15, 0.7, ex * ex + ey * ey);
+    const a = (1 - 0.7 * onFace) * (-s * L.phi * w + L.lift * w * (0.09 * Math.sin(t * 2.1 - w * 3.2 + x * 0.012) + 0.035 * Math.sin(t * 3.7 + x * 0.03)));
     const dx = 0, dy = y - ry, ca = Math.cos(a), sa = Math.sin(a);
     pos[k * 3] = x + dx * ca - dy * sa + s * L.phi * w * L.W * 0.05;
     pos[k * 3 + 1] = -(ry + dx * sa + dy * ca - L.lift * w * L.H * 0.03);
@@ -916,7 +925,7 @@ function bendHairLayer(b, t) {
 function updateHairLayer(b, t, dt, el, opening) {
   const L = b.hairL;
   let pt = 0, lt = 0;
-  if (opening && el >= IMPACT_AT + 0.02) { pt = 0.3 + 0.04 * Math.sin(t * 1.2); lt = 1; if (!L.launched) { L.launched = true; L.phiV += 3.4; L.liftV += 5; } }
+  if (opening && el >= IMPACT_AT + 0.02) { pt = 0.22 + 0.03 * Math.sin(t * 1.2); lt = 1; if (!L.launched) { L.launched = true; L.phiV += 3.4; L.liftV += 5; } }
   const K = 36, C = 2 * (opening ? 0.3 : 0.75) * Math.sqrt(K), steps = Math.max(1, Math.ceil(dt / (1 / 240))), h = dt / steps;
   for (let i = 0; i < steps; i++) { L.phiV += (K * (pt - L.phi) - C * L.phiV) * h; L.phi += L.phiV * h; L.liftV += (K * (lt - L.lift) - C * L.liftV) * h; L.lift += L.liftV * h; }
   bendHairLayer(b, t);
@@ -926,14 +935,15 @@ function updateHairLayer(b, t, dt, el, opening) {
 function toDisp(f, lx, ly) { const c = Math.cos(f.ang), s = Math.sin(f.ang); return [(f.ox + c * lx - s * ly) * sc, (f.oy + s * lx + c * ly) * sc]; }
 function scrap(x, y, vx, vy, delay, big) {
   const r = Math.random, n = 5 + ((r() * 3) | 0), pts = [];
-  for (let i = 0; i < n; i++) { const a = i / n * Math.PI * 2 + (r() - .5) * 0.6, rr = 0.6 + r() * 0.5; pts.push([Math.cos(a) * rr, Math.sin(a) * rr * (0.8 + r() * 0.6)]); }
+  const len = 1.6 + r() * 1.2;
+  for (let i = 0; i < n; i++) { const a = i / n * Math.PI * 2 + (r() - .5) * 0.5, rr = 0.55 + r() * 0.35; const taper = 1 - 0.45 * Math.max(0, Math.cos(a)); pts.push([Math.cos(a) * rr * len, Math.sin(a) * rr * 0.55 * taper]); }
   particles.push({ x, y, vx, vy, pts, s: (big ? 12 : 6) * (0.6 + r() * 0.9), rot: r() * 6, vr: (r() - .5) * 16, flip: r() * 6, vf: 5 + r() * 12, life: 0, max: 0.8 + r() * 0.9, delay, ink: r() < .25, strokes: r() < .6 });
 }
 function burst(b) {
   const f = b.f, r = Math.random;
-  for (let i = 0; i < 34; i++) {
+  for (let i = 0; i < 20; i++) {
     const ly = f.minY + r() * (f.maxY - f.minY);
-    const [x, y] = toDisp(f, b.mode === 'double' ? f.spineX : f.maxX - (f.maxX - f.minX) * 0.06, ly);
+    const [x, y] = toDisp(f, b.mode === 'double' ? f.spineX : (b.singleSide < 0 ? f.maxX - (f.maxX - f.minX) * 0.06 : f.minX + (f.maxX - f.minX) * 0.06), ly);
     const a = (r() < .5 ? Math.PI : 0) + (r() - .5) * 1.2 + f.ang, sp = 200 + r() * 600;
     scrap(x, y, Math.cos(a) * sp, Math.sin(a) * sp - 150, 0.26 + r() * 0.05, r() < .5);
   }
@@ -977,7 +987,7 @@ function drawFx(t, dt) {
         if (e < IMPACT_AT + 0.25) {
           const q = smooth(0.02, IMPACT_AT - 0.02, e), fade = 1 - smooth(IMPACT_AT + 0.05, IMPACT_AT + 0.25, e);
           // the free edge lights up along the right side of the face, top to bottom
-          const edge = b.mode === 'double' ? Array.from({ length: 24 }, (_, i) => toDisp(f, f.spineX, f.minY + 4 + (f.maxY - f.minY - 8) * i / 23)) : f.poly.filter(pt => pt.x > f.spineX + (f.maxX - f.minX) * 0.12).sort((u, v) => u.y - v.y).map(pt => toDisp(f, pt.x, pt.y));
+          const edge = b.mode === 'double' ? Array.from({ length: 24 }, (_, i) => toDisp(f, f.spineX, f.minY + 4 + (f.maxY - f.minY - 8) * i / 23)) : f.poly.filter(pt => (pt.x - f.spineX) * -b.singleSide > (f.maxX - f.minX) * 0.12).sort((u, v) => u.y - v.y).map(pt => toDisp(f, pt.x, pt.y));
           const nUse = Math.max(2, Math.ceil(edge.length * q)), path = edge.slice(0, nUse);
           const [bx2, by2] = path[path.length - 1];
           fxx.save(); fxx.globalAlpha = fade; fxx.lineCap = 'round'; fxx.lineJoin = 'round';
@@ -1028,7 +1038,8 @@ function drawFx(t, dt) {
     const draw = (ox, oy, al) => {
       fxx.save(); fxx.translate(p.x + ox, p.y + oy); fxx.rotate(p.rot); fxx.scale(Math.cos(p.flip) * p.s, p.s); fxx.globalAlpha = al;
       fxx.beginPath(); p.pts.forEach(([x, y], i) => i ? fxx.lineTo(x, y) : fxx.moveTo(x, y)); fxx.closePath();
-      fxx.fillStyle = p.spark ? '#ff9a6a' : p.ink ? '#2a1d26' : (Math.cos(p.flip) > 0 ? '#f3e9d3' : '#cdbb97'); fxx.fill();
+      fxx.fillStyle = p.spark ? '#ff9a6a' : p.ink ? '#3a2a2e' : (Math.cos(p.flip) > 0 ? '#f4e8cd' : '#d9c39b'); fxx.fill();
+      if (!p.spark && !p.ink) { fxx.strokeStyle = 'rgba(255,214,150,0.7)'; fxx.lineWidth = 0.08; fxx.stroke(); }
       if (p.strokes && !p.ink) { fxx.strokeStyle = 'rgba(40,25,30,.7)'; fxx.lineWidth = 0.12; fxx.beginPath(); fxx.moveTo(-0.1, -0.5); fxx.lineTo(-0.1, 0.4); fxx.moveTo(0.25, -0.4); fxx.lineTo(0.2, 0.1); fxx.stroke(); }
       fxx.restore();
     };
@@ -1147,7 +1158,7 @@ stage.addEventListener('pointerdown', e => {
   const b = books.find(x => x.state === 'open' || x.state === 'opening');
   if (!b) return;
   const r = stage.getBoundingClientRect(), f = b.f, [sx] = toDisp(f, f.spineX, (f.minY + f.maxY) / 2);
-  const side = b.mode === 'double' ? (e.clientX - r.left < sx ? -1 : 1) : -1;
+  const side = b.mode === 'double' ? (e.clientX - r.left < sx ? -1 : 1) : b.singleSide;
   drag = { id: e.pointerId, side, x0: e.clientX, d0: side < 0 ? dragOpen.L : dragOpen.R, w: Math.max(80, (f.maxX - f.minX) * sc) };
   try { stage.setPointerCapture(e.pointerId); } catch (_) {}
   stage.classList.add('dragging');
@@ -1186,10 +1197,14 @@ function faceUniforms() {
     v.set(cx, -cy, (f.maxY - f.minY) * sc * 0.5, 1);
   });
 }
+function disposeBook(b) {
+  scene.remove(b.group);
+  b.group.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material) { const u = o.material.uniforms; if (u && u.front && u.front.value) u.front.value.dispose(); if (u && u.back && u.back.value && u.back.value !== (u.front && u.front.value)) u.back.value.dispose(); if (o.material.map) o.material.map.dispose(); o.material.dispose(); } });
+}
 function openAll() {
   if (!faces.length) { msg('顔が見つかりません。正面を向いた明るい写真で試してください。'); return; }
   frozen = true;
-  books.forEach(b => scene.remove(b.group)); books = [];
+  books.forEach(disposeBook); books = [];
   { const c = mk(24, 24), x = c.getContext('2d', { willReadFrequently: true }); { const fr = faces[0].frame, hh = (fr.maxY - fr.minY) * 1.3; x.drawImage(src, fr.ox - hh / 2, fr.oy - hh / 2, hh, hh, 0, 0, 24, 24); } const d = x.getImageData(0, 0, 24, 24).data; let m = 0; for (let i = 0; i < d.length; i += 4) m += (0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2]) / 255; U.uThresh.value = clamp(m / 576 * 0.95, 0.28, 0.62); }
   dragOpen.L = dragOpen.R = 0;
   books = faces.map((fc, i) => createBook(fc, i));
@@ -1227,7 +1242,7 @@ $('#ink').addEventListener('focus', () => { inkFocus = true; });
 $('#ink').addEventListener('blur', () => { inkFocus = false; });
 $('#btnSound').addEventListener('click', e => { soundOn = !soundOn; e.currentTarget.setAttribute('aria-pressed', soundOn); e.currentTarget.textContent = soundOn ? '音 オン' : '音 オフ'; });
 
-function resetSource() { books.forEach(b => scene.remove(b.group)); books = []; frozen = false; grade = 0; fxState = null; sfxState = null; particles = []; $('#openLabel').textContent = 'ひらく'; }
+function resetSource() { books.forEach(disposeBook); books = []; srcGen++; frozen = false; grade = 0; fxState = null; sfxState = null; particles = []; $('#openLabel').textContent = 'ひらく'; }
 function stopVideo() { if (video && video.srcObject) video.srcObject.getTracks().forEach(t => t.stop()); video = null; }
 
 function useDemo() { stopVideo(); resetSource(); mode = 'demo'; faces = drawDemo(); layout(); msg(''); pill('見本の顔', 'ok'); }
@@ -1324,19 +1339,24 @@ async function loadModels() {
   if (pendingImage) { pendingImage = false; detectNow(512); }
 }
 function topExpr(ex) { let best = 'neutral', v = 0; for (const k in ex) if (typeof ex[k] === 'number' && ex[k] > v) { v = ex[k]; best = k; } return best; }
+let srcGen = 0, detectAgain = 0;
 async function detectNow(size) {
-  if (!modelsReady || detecting) return; detecting = true;
+  if (!modelsReady) return;
+  if (detecting) { detectAgain = size; return; }
+  detecting = true; const gen = srcGen;
   try {
     const opts = new faceapi.TinyFaceDetectorOptions({ inputSize: size, scoreThreshold: 0.45 });
     const res = await faceapi.detectAllFaces(src, opts).withFaceLandmarks(true).withFaceExpressions();
     const found = res.sort((a, b) => b.detection.box.area - a.detection.box.area).slice(0, 4)
       .map(r => ({ frame: frameFromLandmarks(r.landmarks.positions), score: r.detection.score, expr: topExpr(r.expressions) }));
+    if (gen !== srcGen) { detecting = false; const s2 = detectAgain || size; detectAgain = 0; return detectNow(s2); }
     if (!frozen) faces = found;
     const n = faces.length;
     pill(n ? `顔を ${n} つ検知` : '顔を探しています', n ? 'ok' : 'busy');
     if (mode === 'image') msg(n ? '' : '顔が見つかりませんでした。正面を向いた、顔が大きめの写真で試してください。');
   } catch (e) { /* skip a failed frame */ }
   detecting = false;
+  if (detectAgain && mode === 'image') { const s2 = detectAgain; detectAgain = 0; detectNow(s2); } else detectAgain = 0;
 }
 
 /* ---------- loop ---------- */
@@ -1351,7 +1371,7 @@ function frame() {
   for (const b of books) updateBook(b, t, dt);
   const closed = books.filter(b => b.state === 'closed');
   if (closed.length) {
-    closed.forEach(b => { scene.remove(b.group); b.group.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material) { const u = o.material.uniforms; if (u && u.front && u.front.value) u.front.value.dispose(); if (u && u.back && u.back.value) u.back.value.dispose(); if (o.material.map) o.material.map.dispose(); o.material.dispose(); } }); });
+    closed.forEach(disposeBook);
     books = books.filter(b => b.state !== 'closed'); if (!books.length) frozen = false;
   }
   // the grade holds until every page has shut
