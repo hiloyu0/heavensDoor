@@ -201,7 +201,7 @@ void main(){
   float lit = kind > 1.5 ? 1.0 : mix(kind < 0.5 ? 0.62 : 0.45, 1.0, clamp(d, 0.0, 1.12));
   float h = hinge > 0.5 ? vUv.x : 1.0 - vUv.x;
   lit *= 1.0 - lift * 0.32 * smoothstep(0.7, 1.0, h);
-  if (kind < 0.5 && isFront) { lit *= 1.0 - 0.22 * lift; float lu = dot(col, vec3(0.299, 0.587, 0.114)); col = mix(col, vec3(0.93, 0.89, 0.8) * (0.55 + 0.5 * lu), 0.45 * lift); }
+  if (kind < 0.5 && isFront) { lit *= 1.0 - 0.22 * lift; float lu = dot(col, vec3(0.299, 0.587, 0.114)); vec3 thru = texture2D(back, vUv).rgb; col = mix(col, mix(vec3(0.95, 0.9, 0.8), thru, 0.7) * (0.6 + 0.45 * lu), 0.55 * lift); }
   if (!isFront) lit = max(lit, 0.8);
   col *= lit;
   // warm rim light and a little light through the paper
@@ -665,8 +665,8 @@ function renderBase(b, reveal) {
   const c = b.baseC, x = c.getContext('2d'), w = c.width, h = c.height, f = b.f, ts = b.ts;
   x.save(); x.clearRect(0, 0, w, h);
   // the skin keeps only its light and shade, printed on paper; the eyes, nostrils and mouth keep their colour
-  x.fillStyle = '#eee8dc'; x.fillRect(0, 0, w, h);
-  x.globalCompositeOperation = 'multiply'; x.globalAlpha = 0.45; x.filter = 'grayscale(1) contrast(0.75) brightness(1.35)'; x.drawImage(b.faceSrc, 0, 0); x.filter = 'none'; x.globalAlpha = 1; x.globalCompositeOperation = 'source-over';
+  x.fillStyle = '#f2e7cf'; x.fillRect(0, 0, w, h);
+  x.globalCompositeOperation = 'multiply'; x.globalAlpha = 0.35; x.filter = 'grayscale(1) contrast(0.75) brightness(1.4)'; x.drawImage(b.faceSrc, 0, 0); x.filter = 'none'; x.globalAlpha = 1; x.globalCompositeOperation = 'source-over';
   const fsz = h * 0.031;
   const mood = MOOD[b.face.expr] || 'ふつう';
   const no = String(((b.seed % 9000) + 1000)).replace(/\d/g, d => '〇一二三四五六七八九'[d]);
@@ -677,9 +677,11 @@ function renderBase(b, reveal) {
   x.globalCompositeOperation = 'multiply'; x.drawImage(pc, 0, 0); x.globalCompositeOperation = 'source-over';
   if (b.hairFM) { const hk = mk(w, h), hkx = hk.getContext('2d'); hkx.drawImage(b.faceOrig, 0, 0); maskWith(hk, b.hairFM); x.drawImage(hk, 0, 0); }
   x.globalCompositeOperation = 'source-over';
-  const keep = mk(w, h), kx = keep.getContext('2d'); kx.filter = 'saturate(0.6)'; kx.drawImage(b.faceOrig, 0, 0); kx.filter = 'none';
+  const keep = mk(w, h), kx = keep.getContext('2d'); kx.filter = 'saturate(0.8)'; kx.drawImage(b.faceOrig, 0, 0); kx.filter = 'none';
   const km = mk(w, h), kmx = km.getContext('2d'); kmx.filter = `blur(${ts * 2}px)`; kmx.fillStyle = '#000'; drawHoles(kmx, holeShapes(f), f, ts, 0, 1.06); kmx.fill();
   maskWith(keep, km); x.drawImage(keep, 0, 0);
+  { const hs2 = holeShapes(f).slice(2), mm = mk(w, h), mmx = mm.getContext('2d'); mmx.filter = `blur(${ts * 2}px)`; mmx.fillStyle = '#000'; drawHoles(mmx, hs2, f, ts, 0, 1.06); mmx.fill();
+    const mu = mk(w, h), mux = mu.getContext('2d'); mux.filter = 'saturate(0.5) brightness(1.02) sepia(0.15)'; mux.drawImage(b.faceOrig, 0, 0); maskWith(mu, mm); x.drawImage(mu, 0, 0); }
   // a soft shadow just inside each hole: they sit deeper than the page
   if (b.recessOn) {
     const hs = holeShapes(f);
@@ -1054,7 +1056,7 @@ function drawFx(t, dt) {
           const nUse = Math.max(2, Math.ceil(edge.length * q)), path = edge.slice(0, nUse);
           const [bx2, by2] = path[path.length - 1];
           fxx.save(); fxx.globalAlpha = fade; fxx.lineCap = 'round'; fxx.lineJoin = 'round';
-          fxx.strokeStyle = impact ? '#ffffff' : 'rgba(255,244,220,0.6)'; fxx.shadowColor = impact ? '#ffffff' : '#fff4dc'; fxx.shadowBlur = 22; fxx.lineWidth = 3 + 5 * smooth(IMPACT_AT - 0.08, IMPACT_AT, e);
+          fxx.strokeStyle = impact ? '#ffffff' : 'rgba(255,244,220,0.35)'; fxx.shadowColor = impact ? '#ffffff' : '#fff4dc'; fxx.shadowBlur = 22; fxx.lineWidth = 3 + 5 * smooth(IMPACT_AT - 0.08, IMPACT_AT, e);
           fxx.beginPath(); path.forEach(([x, y], i) => i ? fxx.lineTo(x, y) : fxx.moveTo(x, y)); fxx.stroke();
           fxx.shadowBlur = 0; fxx.strokeStyle = '#fffaf0'; fxx.lineWidth = 1.4; fxx.stroke();
           // spark at the leading point
@@ -1099,7 +1101,7 @@ function drawFx(t, dt) {
     p.vy += 420 * dt; p.vx *= Math.pow(0.35, dt); p.vy *= Math.pow(0.6, dt); p.x += p.vx * dt; p.y += p.vy * dt; p.rot += p.vr * dt; p.flip += p.vf * dt;
     const a = clamp(1 - l / p.max, 0, 1) * smooth(0, 0.04, l);
     const draw = (ox, oy, al) => {
-      fxx.save(); fxx.translate(p.x + ox, p.y + oy); fxx.rotate(p.rot); fxx.scale(Math.cos(p.flip) * p.s, p.s); fxx.globalAlpha = al;
+      fxx.save(); fxx.translate(p.x + ox, p.y + oy); fxx.rotate(p.rot); const sk = 0.4 + 0.6 * a; fxx.scale(Math.cos(p.flip) * p.s * sk, p.s * sk); fxx.globalAlpha = al;
       fxx.beginPath(); p.pts.forEach(([x, y], i) => i ? fxx.lineTo(x, y) : fxx.moveTo(x, y)); fxx.closePath();
       fxx.fillStyle = p.spark ? '#ff9a6a' : p.ink ? '#3a2a2e' : (Math.cos(p.flip) > 0 ? '#f4e8cd' : '#d9c39b'); fxx.fill();
       if (!p.spark && !p.ink) { fxx.strokeStyle = 'rgba(255,214,150,0.7)'; fxx.lineWidth = 0.08; fxx.stroke(); }
