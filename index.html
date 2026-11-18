@@ -206,7 +206,7 @@ void main(){
   col *= lit;
   // warm rim light and a little light through the paper
   float rim = pow(1.0 - abs(dot(n, V)), 3.0);
-  col += vec3(1.0, 0.86, 0.62) * smoothstep(0.35, 1.0, rim) * 0.22 * lift;
+  col += vec3(1.0, 0.86, 0.62) * smoothstep(0.5, 1.0, rim) * 0.12 * lift;
   if (!isFront) col += vec3(0.10, 0.07, 0.03) * lift;
   // lower pages sit deeper in the book, so they get less light
   if (kind > 0.5 && kind < 1.5) col *= 0.86 + 0.14 * layer;
@@ -594,18 +594,20 @@ function createBook(face, idx) {
   const cutEdge = (c, flip) => { const x = c.getContext('2d'); x.save(); x.globalCompositeOperation = 'source-atop'; x.strokeStyle = 'rgba(255,248,232,0.85)'; x.lineWidth = Math.max(1, ts * 1.0); drawHoles(x, holes, f, ts, flip ? w : 0, 1.04, hf.sx); x.stroke(); x.strokeStyle = 'rgba(90,60,40,0.1)'; x.lineWidth = Math.max(1, ts * 0.7); drawHoles(x, holes, f, ts, flip ? w : 0, 1.1, hf.sx); x.stroke(); x.restore(); };
   for (let k = 0; k <= NPAGES; k++) {
     const isCover = k === NPAGES;
-    let front, back = mk(w, h); const bx = back.getContext('2d');
+    let front, frontW = null, backW = null, back = mk(w, h); const bx = back.getContext('2d');
     if (isCover) { front = crop(coverSrc, hf.sx, hf.sw); maskWith(front, m); }
     else {
       front = mk(w, h); const x = front.getContext('2d'); paper(x, w, h, seed + k * 31 + hf.side, k % 2);
       vText(x, [{ t: pick(10).join('。') }], box, fsz * (0.9 + r() * 0.2), 'rgba(40,28,30,0.85)', seed + k * 7 + hf.side, null, B);
-      const holed = k >= NPAGES - 1;
-      maskWith(front, holed ? m : mW); atop(front, rim); if (holed) cutEdge(front, false);
+      // every page has the holes while it lies over the face (so the eyes show through);
+      // deeper pages swap to whole paper once they stand out in the fan
+      if (k < NPAGES - 1) { frontW = mk(w, h); frontW.getContext('2d').drawImage(front, 0, 0); maskWith(frontW, mW); atop(frontW, rim); }
+      maskWith(front, m); atop(front, rim); if (k >= NPAGES - 1) cutEdge(front, false);
     }
     paper(bx, w, h, seed + k * 17 + 5 + hf.side, (k + 1) % 2);
     vText(bx, [{ t: pick(12).join('。') }], box, fsz * (0.85 + r() * 0.15), 'rgba(28,20,24,0.95)', seed + k * 13 + hf.side, null, Bf);
-    const holedB = k >= NPAGES - 1;
-    maskWith(back, holedB ? mf : mWf); atop(back, rimF); if (holedB) cutEdge(back, true);
+    if (!isCover && k < NPAGES - 1) { backW = mk(w, h); backW.getContext('2d').drawImage(back, 0, 0); maskWith(backW, mWf); atop(backW, rimF); }
+    maskWith(back, mf); atop(back, rimF); if (k >= NPAGES - 1) cutEdge(back, true);
     const geom = pageGeom(hf.side), sgeom = new THREE.BufferGeometry();
     sgeom.setIndex(geom.getIndex()); sgeom.setAttribute('uv', geom.attributes.uv);
     sgeom.setAttribute('position', new THREE.BufferAttribute(new Float32Array(geom.attributes.position.array.length), 3));
@@ -624,6 +626,7 @@ function createBook(face, idx) {
       delay: (isCover ? 0.26 : 0.36 + [0, 0.05, 0.09, 0.125, 0.155][NPAGES - 1 - k]) + (hf.side > 0 ? 0.015 : 0),
       K: isCover ? 120 : 80 + r() * 60, zeta: isCover ? 0.5 : 0.34 + r() * 0.14,
       theta: 0, vel: 0, bend: 0, wave: 0, phase: r() * 6.28, launched: false };
+    if (frontW) { p.texHoled = [mat.uniforms.front.value, mat.uniforms.back.value]; p.texWhole = [tex(frontW), tex(backW)]; p.whole = false; }
     bendPage(p, f); pages.push(p);
   }
   }
@@ -683,7 +686,7 @@ function renderBase(b, reveal) {
   const keep = mk(w, h), kx = keep.getContext('2d'); kx.filter = 'saturate(0.8)'; kx.drawImage(b.faceOrig, 0, 0); kx.filter = 'none';
   const km = mk(w, h), kmx = km.getContext('2d'); kmx.filter = `blur(${ts * 2}px)`; kmx.fillStyle = '#000'; drawHoles(kmx, holeShapes(f), f, ts, 0, 1.06); kmx.fill();
   maskWith(keep, km); x.drawImage(keep, 0, 0);
-  { const hs2 = holeShapes(f).slice(2), mm = mk(w, h), mmx = mm.getContext('2d'); mmx.filter = `blur(${ts * 2}px)`; mmx.fillStyle = '#000'; drawHoles(mmx, hs2, f, ts, 0, 1.06); mmx.fill();
+  if (b.recessOn) { const hs2 = holeShapes(f).slice(2), mm = mk(w, h), mmx = mm.getContext('2d'); mmx.filter = `blur(${ts * 2}px)`; mmx.fillStyle = '#000'; drawHoles(mmx, hs2, f, ts, 0, 1.06); mmx.fill();
     const mu = mk(w, h), mux = mu.getContext('2d'); mux.filter = 'saturate(0.35) brightness(1.04) sepia(0.2)'; mux.drawImage(b.faceOrig, 0, 0); mux.filter = 'none'; mux.globalAlpha = 0.3; mux.fillStyle = '#f2e7cf'; mux.fillRect(0, 0, w, h); mux.globalAlpha = 1; maskWith(mu, mm); x.drawImage(mu, 0, 0); }
   // a soft shadow just inside each hole: they sit deeper than the page
   if (b.recessOn) {
@@ -753,6 +756,7 @@ function updateBook(b, t, dt) {
     const settledFlat = hiddenOnClose || opening && !p.isCover && p.k < NPAGES - 1 && el > p.delay + 1.0 && p.theta < 0.3;
     p.mesh.visible = p.smesh.visible = !settledFlat && (p.isCover || p.theta > 0.002 || (opening && el > p.delay - 0.03));
     p.rel = p.isCover ? clamp(p.theta / 0.6, 0, 1) : 0;
+    if (p.texWhole) { const want = p.theta > 1.35; if (want !== p.whole) { p.whole = want; const tx = want ? p.texWhole : p.texHoled; p.mesh.material.uniforms.front.value = tx[0]; p.mesh.material.uniforms.back.value = tx[1]; } }
     p.mesh.material.uniforms.lift.value = clamp(p.theta / 0.9, 0, 1);
     const casts = p.isCover || p.k === NPAGES - 1;
     p.smesh.visible = p.smesh.visible && casts;
@@ -1267,6 +1271,7 @@ function faceUniforms() {
 }
 function disposeBook(b) {
   scene.remove(b.group);
+  b.pages.forEach(p => { if (p.texWhole) [...p.texWhole, ...p.texHoled].forEach(t => t.dispose()); });
   b.group.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material) { const u = o.material.uniforms; if (u && u.front && u.front.value) u.front.value.dispose(); if (u && u.back && u.back.value && u.back.value !== (u.front && u.front.value)) u.back.value.dispose(); if (o.material.map) o.material.map.dispose(); o.material.dispose(); } });
 }
 function openAll() {
