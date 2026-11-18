@@ -100,7 +100,7 @@ kbd { font-family: var(--f-body); font-size: 11px; border: 1px solid currentColo
       <button id="btnOpen" type="button"><span id="openLabel">ひらく</span> <kbd>Space</kbd></button>
       <button id="btnCam" type="button">カメラ</button>
       <input id="snap" type="file" accept="image/*" capture="user" hidden>
-      <label class="btn" for="file">写真を選ぶ<input id="file" type="file" accept="image/*"></label>
+      <label class="btn" for="file" title="ページのどこにでもドロップできます">写真を選ぶ／ドロップ<input id="file" type="file" accept="image/*"></label>
       <button id="btnSound" type="button" aria-pressed="true">音 オン</button>
       <button id="btnHair" type="button" aria-pressed="true">髪をなびかせる オン</button>
       <button id="btnMode" type="button">開き方：片開き</button>
@@ -206,7 +206,7 @@ void main(){
   col *= lit;
   // warm rim light and a little light through the paper
   float rim = pow(1.0 - abs(dot(n, V)), 3.0);
-  col += vec3(1.0, 0.78, 0.42) * rim * 0.45 * lift;
+  col += vec3(1.0, 0.86, 0.62) * smoothstep(0.35, 1.0, rim) * 0.22 * lift;
   if (!isFront) col += vec3(0.10, 0.07, 0.03) * lift;
   // lower pages sit deeper in the book, so they get less light
   if (kind > 0.5 && kind < 1.5) col *= 0.86 + 0.14 * layer;
@@ -564,6 +564,7 @@ function createBook(face, idx) {
   const holes = f.feats ? holeShapes(f) : [];
   const holesC = mk(Wp, Hp), hcx = holesC.getContext('2d'); hcx.filter = `blur(${Math.max(0.8, ts * 0.9)}px)`; hcx.fillStyle = '#000'; drawHoles(hcx, holes, f, ts); hcx.fill();
   const maskC = mk(Wp, Hp), mx = maskC.getContext('2d'); mx.filter = `blur(${Math.max(1, ts * 1.2)}px)`; mx.drawImage(raw, 0, 0); mx.filter = 'none';
+  const maskWhole = mk(Wp, Hp); maskWhole.getContext('2d').drawImage(maskC, 0, 0);
   mx.globalCompositeOperation = 'destination-out'; mx.drawImage(holesC, 0, 0);
   const fsz = Hp * 0.04;
   const bag = POOL.slice().sort(() => r() - 0.5); let bi = 0;
@@ -583,7 +584,7 @@ function createBook(face, idx) {
   const halves = double ? [{ side: -1, sx: 0, sw: spP }, { side: 1, sx: spP, sw: Wp - spP }] : [{ side: singleSide, sx: 0, sw: Wp }];
   const Bfull = boundsOf(raw);
   for (const hf of halves) {
-  const w = hf.sw, h = Hp, m = crop(maskC, hf.sx, hf.sw), mf = crop(maskC, hf.sx, hf.sw, true);
+  const w = hf.sw, h = Hp, m = crop(maskC, hf.sx, hf.sw), mf = crop(maskC, hf.sx, hf.sw, true), mW = crop(maskWhole, hf.sx, hf.sw), mWf = crop(maskWhole, hf.sx, hf.sw, true);
   const B = boundsOf(crop(raw, hf.sx, hf.sw)), Bf = B.flip();
   const soft = blurred(m, Math.max(6, ts * 9));
   const rim = rimOf(m, Math.max(2, ts * 1.6), 'rgba(110,78,50,0.28)');
@@ -597,12 +598,14 @@ function createBook(face, idx) {
     if (isCover) { front = crop(coverSrc, hf.sx, hf.sw); maskWith(front, m); }
     else {
       front = mk(w, h); const x = front.getContext('2d'); paper(x, w, h, seed + k * 31 + hf.side, k % 2);
-      vText(x, pick(double ? 3 : 4), box, fsz * (0.9 + r() * 0.2), 'rgba(40,28,30,0.85)', seed + k * 7 + hf.side, null, B);
-      maskWith(front, m); atop(front, rim); cutEdge(front, false);
+      vText(x, [{ t: pick(10).join('。') }], box, fsz * (0.9 + r() * 0.2), 'rgba(40,28,30,0.85)', seed + k * 7 + hf.side, null, B);
+      const holed = k >= NPAGES - 1;
+      maskWith(front, holed ? m : mW); atop(front, rim); if (holed) cutEdge(front, false);
     }
     paper(bx, w, h, seed + k * 17 + 5 + hf.side, (k + 1) % 2);
-    vText(bx, pick(double ? 5 : 8), box, fsz * (0.85 + r() * 0.15), 'rgba(28,20,24,0.95)', seed + k * 13 + hf.side, null, Bf);
-    maskWith(back, mf); atop(back, rimF); cutEdge(back, true);
+    vText(bx, [{ t: pick(12).join('。') }], box, fsz * (0.85 + r() * 0.15), 'rgba(28,20,24,0.95)', seed + k * 13 + hf.side, null, Bf);
+    const holedB = k >= NPAGES - 1;
+    maskWith(back, holedB ? mf : mWf); atop(back, rimF); if (holedB) cutEdge(back, true);
     const geom = pageGeom(hf.side), sgeom = new THREE.BufferGeometry();
     sgeom.setIndex(geom.getIndex()); sgeom.setAttribute('uv', geom.attributes.uv);
     sgeom.setAttribute('position', new THREE.BufferAttribute(new Float32Array(geom.attributes.position.array.length), 3));
@@ -681,7 +684,7 @@ function renderBase(b, reveal) {
   const km = mk(w, h), kmx = km.getContext('2d'); kmx.filter = `blur(${ts * 2}px)`; kmx.fillStyle = '#000'; drawHoles(kmx, holeShapes(f), f, ts, 0, 1.06); kmx.fill();
   maskWith(keep, km); x.drawImage(keep, 0, 0);
   { const hs2 = holeShapes(f).slice(2), mm = mk(w, h), mmx = mm.getContext('2d'); mmx.filter = `blur(${ts * 2}px)`; mmx.fillStyle = '#000'; drawHoles(mmx, hs2, f, ts, 0, 1.06); mmx.fill();
-    const mu = mk(w, h), mux = mu.getContext('2d'); mux.filter = 'saturate(0.5) brightness(1.02) sepia(0.15)'; mux.drawImage(b.faceOrig, 0, 0); maskWith(mu, mm); x.drawImage(mu, 0, 0); }
+    const mu = mk(w, h), mux = mu.getContext('2d'); mux.filter = 'saturate(0.35) brightness(1.04) sepia(0.2)'; mux.drawImage(b.faceOrig, 0, 0); mux.filter = 'none'; mux.globalAlpha = 0.3; mux.fillStyle = '#f2e7cf'; mux.fillRect(0, 0, w, h); mux.globalAlpha = 1; maskWith(mu, mm); x.drawImage(mu, 0, 0); }
   // a soft shadow just inside each hole: they sit deeper than the page
   if (b.recessOn) {
     const hs = holeShapes(f);
@@ -1050,7 +1053,7 @@ function drawFx(t, dt) {
         const fr = (f.maxY - f.minY) * sc * 0.5, R = Math.hypot(dispW, dispH);
         // seam: a straight hairline of light that runs down the split, then tears
         if (e < IMPACT_AT + 0.25) {
-          const q = smooth(0.02, IMPACT_AT - 0.02, e), fade = 1 - smooth(IMPACT_AT + 0.02, IMPACT_AT + 0.14, e);
+          const q = smooth(0.02, IMPACT_AT - 0.02, e), fade = 1 - smooth(IMPACT_AT - 0.02, IMPACT_AT + 0.08, e);
           // the free edge lights up along the right side of the face, top to bottom
           const edge = b.mode === 'double' ? Array.from({ length: 24 }, (_, i) => toDisp(f, f.spineX, f.minY + 4 + (f.maxY - f.minY - 8) * i / 23)) : f.poly.filter(pt => (pt.x - f.spineX) * -b.singleSide > (f.maxX - f.minX) * 0.12).sort((u, v) => u.y - v.y).map(pt => toDisp(f, pt.x, pt.y));
           const nUse = Math.max(2, Math.ceil(edge.length * q)), path = edge.slice(0, nUse);
@@ -1362,9 +1365,12 @@ async function useImage(file) {
   img.src = url;
 }
 $('#file').addEventListener('change', e => useImage(e.target.files[0]));
-stage.addEventListener('dragover', e => { e.preventDefault(); $('#drop').hidden = false; });
-stage.addEventListener('dragleave', () => { $('#drop').hidden = true; });
-stage.addEventListener('drop', e => { e.preventDefault(); $('#drop').hidden = true; useImage(e.dataTransfer.files[0]); });
+let dragDepth = 0;
+const hasFiles = e => e.dataTransfer && [...(e.dataTransfer.types || [])].includes('Files');
+window.addEventListener('dragenter', e => { if (!hasFiles(e)) return; dragDepth++; $('#drop').hidden = false; });
+window.addEventListener('dragover', e => { if (!hasFiles(e)) return; e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; });
+window.addEventListener('dragleave', e => { if (!hasFiles(e)) return; dragDepth = Math.max(0, dragDepth - 1); if (!dragDepth) $('#drop').hidden = true; });
+window.addEventListener('drop', e => { if (!hasFiles(e)) return; e.preventDefault(); dragDepth = 0; $('#drop').hidden = true; const fl = [...e.dataTransfer.files].find(f => f.type.startsWith('image/')); if (fl) useImage(fl); else msg('画像ファイルをドロップしてください。'); });
 
 $('#snap').addEventListener('change', e => useImage(e.target.files[0]));
 $('#btnCam').addEventListener('click', async () => {
