@@ -204,6 +204,7 @@ void main(){
   if (kind < 0.5 && isFront) { lit *= 1.0 - 0.22 * lift; float lu = dot(col, vec3(0.299, 0.587, 0.114)); vec3 thru = texture2D(back, vUv).rgb; col = mix(col, mix(vec3(0.95, 0.9, 0.8), thru, 0.7) * (0.6 + 0.45 * lu), 0.55 * lift); }
   if (!isFront) lit = max(lit, 0.8);
   col *= lit;
+  if (kind > 0.5 && kind < 1.5) col = min(col, vec3(0.93));
   // warm rim light and a little light through the paper
   float rim = pow(1.0 - abs(dot(n, V)), 3.0);
   col += vec3(1.0, 0.86, 0.62) * smoothstep(0.5, 1.0, rim) * 0.12 * lift;
@@ -589,6 +590,7 @@ function createBook(face, idx) {
   const soft = blurred(m, Math.max(6, ts * 9));
   const rim = rimOf(m, Math.max(2, ts * 1.6), 'rgba(110,78,50,0.15)');
   const rimF = rimOf(mf, Math.max(2, ts * 1.6), 'rgba(110,78,50,0.14)');
+  const rimW = rimOf(mW, Math.max(2, ts * 1.6), 'rgba(110,78,50,0.15)'), rimWf = rimOf(mWf, Math.max(2, ts * 1.6), 'rgba(110,78,50,0.14)');
   const box = { left: w * 0.05, right: w * 0.95, top: 0, bottom: h };
   // the cut edge around each hole: a bright paper edge
   const cutEdge = (c, flip) => { const x = c.getContext('2d'); x.save(); x.globalCompositeOperation = 'source-atop'; x.strokeStyle = 'rgba(255,248,232,0.85)'; x.lineWidth = Math.max(1, ts * 1.0); drawHoles(x, holes, f, ts, flip ? w : 0, 1.04, hf.sx); x.stroke(); x.strokeStyle = 'rgba(90,60,40,0.1)'; x.lineWidth = Math.max(1, ts * 0.7); drawHoles(x, holes, f, ts, flip ? w : 0, 1.1, hf.sx); x.stroke(); x.restore(); };
@@ -601,12 +603,12 @@ function createBook(face, idx) {
       vText(x, [{ t: pick(10).join('。') }], box, fsz * (0.9 + r() * 0.2), 'rgba(40,28,30,0.85)', seed + k * 7 + hf.side, null, B);
       // every page has the holes while it lies over the face (so the eyes show through);
       // deeper pages swap to whole paper once they stand out in the fan
-      { frontW = mk(w, h); frontW.getContext('2d').drawImage(front, 0, 0); maskWith(frontW, mW); atop(frontW, rim); }
+      { frontW = mk(w, h); frontW.getContext('2d').drawImage(front, 0, 0); maskWith(frontW, mW); atop(frontW, rimW); }
       maskWith(front, m); atop(front, rim); if (k >= NPAGES - 1) cutEdge(front, false);
     }
     paper(bx, w, h, seed + k * 17 + 5 + hf.side, (k + 1) % 2);
     vText(bx, [{ t: pick(12).join('。') }], box, fsz * (0.85 + r() * 0.15), 'rgba(28,20,24,0.95)', seed + k * 13 + hf.side, null, Bf);
-    if (!isCover) { backW = mk(w, h); backW.getContext('2d').drawImage(back, 0, 0); maskWith(backW, mWf); atop(backW, rimF); }
+    if (!isCover) { backW = mk(w, h); backW.getContext('2d').drawImage(back, 0, 0); maskWith(backW, mWf); atop(backW, rimWf); }
     maskWith(back, mf); atop(back, rimF); if (k >= NPAGES - 1) cutEdge(back, true);
     const geom = pageGeom(hf.side), sgeom = new THREE.BufferGeometry();
     sgeom.setIndex(geom.getIndex()); sgeom.setAttribute('uv', geom.attributes.uv);
@@ -672,7 +674,7 @@ function renderBase(b, reveal) {
   x.save(); x.clearRect(0, 0, w, h);
   // the skin keeps only its light and shade, printed on paper; the eyes, nostrils and mouth keep their colour
   x.fillStyle = '#f2e7cf'; x.fillRect(0, 0, w, h);
-  x.globalCompositeOperation = 'multiply'; x.globalAlpha = 0.45; x.filter = 'grayscale(1) contrast(0.8) brightness(1.3)'; x.drawImage(b.faceSrc, 0, 0); x.filter = 'none'; x.globalAlpha = 1; x.globalCompositeOperation = 'source-over';
+  x.globalCompositeOperation = 'multiply'; x.globalAlpha = 0.55; x.filter = 'grayscale(1) contrast(0.9) brightness(1.28)'; x.drawImage(b.faceSrc, 0, 0); x.filter = 'none'; x.globalAlpha = 1; x.globalCompositeOperation = 'source-over';
   const fsz = h * 0.031;
   const mood = MOOD[b.face.expr] || 'ふつう';
   const no = String(((b.seed % 9000) + 1000)).replace(/\d/g, d => '〇一二三四五六七八九'[d]);
@@ -687,14 +689,14 @@ function renderBase(b, reveal) {
   const km = mk(w, h), kmx = km.getContext('2d'); kmx.filter = `blur(${ts * 2}px)`; kmx.fillStyle = '#000'; drawHoles(kmx, holeShapes(f), f, ts, 0, 1.06); kmx.fill();
   maskWith(keep, km); x.drawImage(keep, 0, 0);
   if (b.recessOn) { const hs2 = holeShapes(f).slice(2), mm = mk(w, h), mmx = mm.getContext('2d'); mmx.filter = `blur(${ts * 2}px)`; mmx.fillStyle = '#000'; drawHoles(mmx, hs2, f, ts, 0, 1.06); mmx.fill();
-    const mu = mk(w, h), mux = mu.getContext('2d'); mux.filter = 'saturate(0.45) brightness(1.08)'; mux.drawImage(b.faceOrig, 0, 0); mux.filter = 'none'; mux.globalCompositeOperation = 'multiply'; mux.fillStyle = '#f2e7cf'; mux.fillRect(0, 0, w, h); mux.globalCompositeOperation = 'source-over'; maskWith(mu, mm); x.drawImage(mu, 0, 0); }
+    const mu = mk(w, h), mux = mu.getContext('2d'); mux.filter = 'saturate(0.28) brightness(1.12) sepia(0.15)'; mux.drawImage(b.faceOrig, 0, 0); mux.filter = 'none'; mux.globalCompositeOperation = 'multiply'; mux.fillStyle = '#f2e7cf'; mux.fillRect(0, 0, w, h); mux.globalCompositeOperation = 'source-over'; maskWith(mu, mm); x.drawImage(mu, 0, 0); }
   // a soft shadow just inside each hole: they sit deeper than the page
   if (b.recessOn) {
     const hs = holeShapes(f);
     x.save(); drawHoles(x, hs, f, ts); x.clip();
     x.filter = `blur(${ts * 2}px)`; x.strokeStyle = 'rgba(25,14,16,0.42)'; x.lineWidth = ts * 2.5; x.translate(0, ts * 2.5); drawHoles(x, hs, f, ts, 0, 1.05); x.stroke();
     x.restore();
-    x.save(); x.fillStyle = f.demoHair ? 'rgba(80,45,40,0.3)' : 'rgba(40,22,20,0.45)'; x.filter = `blur(${ts * 0.8}px)`; drawHoles(x, hs.slice(3), f, ts, 0, 0.8); x.fill(); x.restore();
+    x.save(); x.fillStyle = f.demoHair ? 'rgba(80,45,40,0.3)' : 'rgba(110,88,70,0.4)'; x.filter = `blur(${ts * 0.8}px)`; drawHoles(x, hs.slice(3), f, ts, 0, 0.8); x.fill(); x.restore();
     x.save(); x.strokeStyle = 'rgba(255,248,232,0.6)'; x.lineWidth = Math.max(1, ts * 0.8); x.beginPath();
     for (const hlo of hs) { const cx = (hlo.x - f.minX) * ts, cy = (hlo.y - f.minY) * ts; x.moveTo(cx + hlo.rx * ts * 1.02 * Math.cos(0.4), cy + hlo.ry * ts * 1.02 * Math.sin(0.4)); x.ellipse(cx, cy, hlo.rx * ts * 1.02, hlo.ry * ts * 1.02, 0, 0.4, Math.PI - 0.4); }
     x.stroke(); x.restore();
