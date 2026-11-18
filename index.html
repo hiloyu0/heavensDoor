@@ -201,7 +201,8 @@ void main(){
   float lit = kind > 1.5 ? 1.0 : mix(kind < 0.5 ? 0.62 : 0.45, 1.0, clamp(d, 0.0, 1.12));
   float h = hinge > 0.5 ? vUv.x : 1.0 - vUv.x;
   lit *= 1.0 - lift * 0.32 * smoothstep(0.7, 1.0, h);
-  if (kind < 0.5 && isFront) lit *= 1.0 - 0.22 * lift;
+  if (kind < 0.5 && isFront) { lit *= 1.0 - 0.22 * lift; float lu = dot(col, vec3(0.299, 0.587, 0.114)); col = mix(col, vec3(0.93, 0.89, 0.8) * (0.55 + 0.5 * lu), 0.45 * lift); }
+  if (!isFront) lit = max(lit, 0.8);
   col *= lit;
   // warm rim light and a little light through the paper
   float rim = pow(1.0 - abs(dot(n, V)), 3.0);
@@ -211,7 +212,6 @@ void main(){
   if (kind > 0.5 && kind < 1.5) col *= 0.86 + 0.14 * layer;
   float amt = kind < 0.5 ? uGrade : uGrade * 0.22;
   // keep the vermilion ink vivid
-  if (kind > 1.5) amt *= 1.0 - smoothstep(0.12, 0.28, f.r - f.g);
   float tone = kind < 0.5 && isFront ? uGrade * 0.28 : 0.0;
   gl_FragColor = vec4(gradeCol(col, amt, tone, vW.xy), f.a);
 }`;
@@ -590,7 +590,7 @@ function createBook(face, idx) {
   const rimF = rimOf(mf, Math.max(2, ts * 1.6), 'rgba(110,78,50,0.25)');
   const box = { left: w * 0.05, right: w * 0.95, top: 0, bottom: h };
   // the cut edge around each hole: a bright paper edge
-  const cutEdge = (c, flip) => { const x = c.getContext('2d'); x.save(); x.globalCompositeOperation = 'source-atop'; x.strokeStyle = 'rgba(255,248,232,0.85)'; x.lineWidth = Math.max(1, ts * 1.0); drawHoles(x, holes, f, ts, flip ? w : 0, 1.04, hf.sx); x.stroke(); x.strokeStyle = 'rgba(90,60,40,0.18)'; x.lineWidth = Math.max(1, ts * 0.7); drawHoles(x, holes, f, ts, flip ? w : 0, 1.1, hf.sx); x.stroke(); x.restore(); };
+  const cutEdge = (c, flip) => { const x = c.getContext('2d'); x.save(); x.globalCompositeOperation = 'source-atop'; x.strokeStyle = 'rgba(255,248,232,0.85)'; x.lineWidth = Math.max(1, ts * 1.0); drawHoles(x, holes, f, ts, flip ? w : 0, 1.04, hf.sx); x.stroke(); x.strokeStyle = 'rgba(90,60,40,0.1)'; x.lineWidth = Math.max(1, ts * 0.7); drawHoles(x, holes, f, ts, flip ? w : 0, 1.1, hf.sx); x.stroke(); x.restore(); };
   for (let k = 0; k <= NPAGES; k++) {
     const isCover = k === NPAGES;
     let front, back = mk(w, h); const bx = back.getContext('2d');
@@ -677,7 +677,7 @@ function renderBase(b, reveal) {
   x.globalCompositeOperation = 'multiply'; x.drawImage(pc, 0, 0); x.globalCompositeOperation = 'source-over';
   if (b.hairFM) { const hk = mk(w, h), hkx = hk.getContext('2d'); hkx.drawImage(b.faceOrig, 0, 0); maskWith(hk, b.hairFM); x.drawImage(hk, 0, 0); }
   x.globalCompositeOperation = 'source-over';
-  const keep = mk(w, h), kx = keep.getContext('2d'); kx.drawImage(b.faceOrig, 0, 0);
+  const keep = mk(w, h), kx = keep.getContext('2d'); kx.filter = 'saturate(0.6)'; kx.drawImage(b.faceOrig, 0, 0); kx.filter = 'none';
   const km = mk(w, h), kmx = km.getContext('2d'); kmx.filter = `blur(${ts * 2}px)`; kmx.fillStyle = '#000'; drawHoles(kmx, holeShapes(f), f, ts, 0, 1.06); kmx.fill();
   maskWith(keep, km); x.drawImage(keep, 0, 0);
   // a soft shadow just inside each hole: they sit deeper than the page
@@ -686,7 +686,7 @@ function renderBase(b, reveal) {
     x.save(); drawHoles(x, hs, f, ts); x.clip();
     x.filter = `blur(${ts * 2}px)`; x.strokeStyle = 'rgba(25,14,16,0.42)'; x.lineWidth = ts * 2.5; x.translate(0, ts * 2.5); drawHoles(x, hs, f, ts, 0, 1.05); x.stroke();
     x.restore();
-    x.save(); x.fillStyle = f.demoHair ? 'rgba(80,45,40,0.3)' : 'rgba(40,22,20,0.6)'; x.filter = `blur(${ts * 0.8}px)`; drawHoles(x, hs.slice(3), f, ts, 0, 0.8); x.fill(); x.restore();
+    x.save(); x.fillStyle = f.demoHair ? 'rgba(80,45,40,0.3)' : 'rgba(40,22,20,0.45)'; x.filter = `blur(${ts * 0.8}px)`; drawHoles(x, hs.slice(3), f, ts, 0, 0.8); x.fill(); x.restore();
     x.save(); x.strokeStyle = 'rgba(255,248,232,0.6)'; x.lineWidth = Math.max(1, ts * 0.8); x.beginPath();
     for (const hlo of hs) { const cx = (hlo.x - f.minX) * ts, cy = (hlo.y - f.minY) * ts; x.moveTo(cx + hlo.rx * ts * 1.02 * Math.cos(0.4), cy + hlo.ry * ts * 1.02 * Math.sin(0.4)); x.ellipse(cx, cy, hlo.rx * ts * 1.02, hlo.ry * ts * 1.02, 0, 0.4, Math.PI - 0.4); }
     x.stroke(); x.restore();
@@ -760,11 +760,11 @@ function updateBook(b, t, dt) {
   const cov = b.pages.find(q => q.isCover);
   if (cov && !b.recessOn && cov.theta > 0.3) { b.recessOn = true; renderBase(b, Math.max(0, b.inkShown)); }
   if (cov && b.recessOn && !opening && cov.theta < 0.15) { b.recessOn = false; renderBase(b, Math.max(0, b.inkShown)); }
-  b.glow.material.opacity = opening ? smooth(0.3, 0.9, el) * (0.22 + 0.04 * Math.sin(t * 3.1)) : Math.max(0, b.glow.material.opacity - dt * 2.5);
+  b.glow.material.opacity = opening ? smooth(0.3, 0.9, el) * (0.32 + 0.04 * Math.sin(t * 3.1)) : Math.max(0, b.glow.material.opacity - dt * 2.5);
   if (opening && el > 0.8 && b.mode !== 'double') {
     // keep every page's free edge inside the picture with a margin
-    const mg = Math.min(dispW, dispH) * 0.05; let out = false, roomy = true;
-    for (const p of b.pages) { if (!p.mesh.visible) continue; for (const row of [0, ROWS >> 1, ROWS]) for (const col of [COLS >> 1, COLS]) {
+    const mg = Math.min(dispW, dispH) * 0.07; let out = false, roomy = true;
+    for (const p of b.pages) { if (!p.mesh.visible) continue; for (const row of [0, ROWS >> 1, ROWS]) for (const col of [COLS >> 1, (COLS * 3) >> 2, COLS]) {
       const a = p.geom.attributes.position.array, k = (row * (COLS + 1) + col) * 3; v3.set(a[k], a[k + 1], a[k + 2]); b.group.localToWorld(v3); v3.project(camera);
       const sx = (v3.x + 1) / 2 * dispW, sy = (1 - v3.y) / 2 * dispH;
       if (sx < mg || sx > dispW - mg || sy < mg || sy > dispH - mg) out = true;
@@ -1066,7 +1066,7 @@ function drawFx(t, dt) {
           const a = impact ? 1 : Math.pow(clamp(1 - (e - IMPACT_AT - IMPACT_LEN) / 0.42, 0, 1), 2);
           const r = rng(((t * 12) | 0) + b.idx * 99);
           fxx.save();
-          for (let i = 0; i < (impact ? 120 : 38); i++) {
+          for (let i = 0; i < (impact ? 100 : 27); i++) {
             const an = r() * Math.PI * 2, wd = (impact ? 0.006 : 0.003) + r() * (impact ? 0.02 : 0.012), r0 = fr * ((impact ? 1.35 : 1.9) + r() * 0.9 + (e - IMPACT_AT) * 0.5);
             const below = Math.sin(an) > 0.35 ? 0.35 : 1;
             fxx.fillStyle = impact ? '#140b18' : `rgba(15,8,20,${0.32 * a * below})`;
