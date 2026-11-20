@@ -1440,7 +1440,6 @@ function useDemo() { stopVideo(); resetSource(); mode = 'demo'; faces = drawDemo
 
 /* sample faces: an original illustration plus generated portraits of fictional people (no real people) */
 const SAMPLES = [
-  { id: 'demo', label: 'イラスト' },
   { id: 'face-01', label: '正面' },
   { id: 'face-02', label: '少し横' },
   { id: 'face-03', label: '笑顔' },
@@ -1459,10 +1458,11 @@ const SAMPLES = [
 ];
 const sampleUrl = id => (window.__KAO_SAMPLES && window.__KAO_SAMPLES[id]) || `samples/${id}.jpg`;
 function markSample(id) { document.querySelectorAll('#samples button').forEach(b => b.setAttribute('aria-pressed', b.dataset.id === id)); }
+const DEFAULT_SAMPLE = 'face-02';
 function buildSamples() {
   const row = $('#samples');
   for (const s of SAMPLES) {
-    const b = document.createElement('button'); b.type = 'button'; b.dataset.id = s.id; b.setAttribute('aria-pressed', s.id === 'demo');
+    const b = document.createElement('button'); b.type = 'button'; b.dataset.id = s.id; b.setAttribute('aria-pressed', s.id === DEFAULT_SAMPLE);
     const img = document.createElement('img'); img.alt = ''; img.width = 44; img.height = 54;
     if (s.id === 'demo') { const c = mk(88, 108); c.getContext('2d').drawImage(src, 180, 220, 440, 540, 0, 0, 88, 108); img.src = c.toDataURL('image/jpeg', 0.85); }
     else { img.src = sampleUrl(s.id); img.onerror = () => b.remove(); }
@@ -1649,10 +1649,10 @@ function frame() {
 }
 
 // boot
-faces = drawDemo();
 buildSamples();
+// start on a sample photo; the drawn illustration is only a fallback if it cannot be loaded
+{ const im = new Image(); im.onload = () => loadImageEl(im, null); im.onerror = () => { faces = drawDemo(); layout(); pill('見本の顔', 'ok'); }; im.src = sampleUrl(DEFAULT_SAMPLE); }
 layout();
-pill('見本の顔', 'ok');
 if (document.fonts) {
   document.fonts.load('20px "Zen Kurenaido"', POOL.join('') + '記録第号いまの気分〇一二三四五六七八九' + Object.values(MOOD).join('')).catch(() => {});
   document.fonts.load('40px "Dela Gothic One"', 'バラララッパタン').catch(() => {});
