@@ -1,4 +1,6 @@
-This folder contains unmodified model files from face-api.js by Vladimir Mandic
+This folder contains model files from face-api.js by Vladimir Mandic
 (https://github.com/vladmandic/face-api, npm @vladmandic/face-api 1.7.13),
 licensed under the MIT License (see LICENSE in this folder).
-Weight files were renamed (.bin to .wasm) only so that the hosting service serves them.
+The weight files were renamed (.bin to .wasm) so that the hosting service serves them,
+and the "paths" entry of each *-weights_manifest.json was changed to the new file name.
+The weights themselves are unchanged.
