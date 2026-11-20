@@ -215,7 +215,7 @@ kbd { font-family: var(--f-body); font-size: 11px; border: 1px solid currentColo
   <div class="samples" id="samples" role="group" aria-label="見本の顔"><span class="lbl">見本</span></div>
   <p id="msg"></p>
   <div class="tip">気に入ったら、作者にコーヒー1杯分の応援をいただけるとうれしいです → <a href="https://ko-fi.com/hiloyu0" target="_blank" rel="noopener">Ko-fi で応援する</a></div>
-  <p class="build">ver. <span id="buildStamp">2026-11-21 07:26</span> JST</p>
+  <p class="build">ver. <span id="buildStamp">2026-11-21 07:32</span> JST</p>
   <details class="notes" open>
     <summary>このアプリについて</summary>
     <ul>
@@ -1722,9 +1722,17 @@ function segmentHair() {
 }
 const MODEL_BASES = ['model', 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.13/model'];
 let mpErr = '', detFails = 0;
+let slowNotice = false;
 async function loadModels() {
   pill('モデル読み込み中', 'busy');
-  try { await loadMediaPipe(); modelsReady = true; pill(mode === 'demo' ? '見本の顔' : '準備完了', 'ok'); if (pendingImage) { pendingImage = false; detectNow(512); } return; }
+  // if the face models never finish loading (old devices, in-app browsers), say so instead of waiting forever
+  setTimeout(() => {
+    if (modelsReady) return;
+    slowNotice = true;
+    camError('このブラウザでは顔認識を読み込めませんでした。Safari や Chrome で開くと使えることがあります。URL をコピーして貼り付けてください。',
+      'Face detection could not be loaded in this browser. It may work in Safari or Chrome: copy the link and paste it there.', { label: '', run: null });
+  }, 20000);
+  try { await loadMediaPipe(); modelsReady = true; if (slowNotice) { slowNotice = false; camError(); } pill(mode === 'demo' ? '見本の顔' : '準備完了', 'ok'); if (pendingImage) { pendingImage = false; detectNow(512); } return; }
   catch (e) { mp = null; mpErr = (e && (e.message || e.name)) || String(e); console.warn('MediaPipe failed', e); /* fall back to face-api */ }
   await loadFaceApi();
 }
@@ -1740,6 +1748,7 @@ async function loadFaceApi() {
     } catch (e) { /* try the next location */ }
   }
   if (!modelsReady) { pill('顔認識なし', ''); msg(`顔認識モデルを読み込めませんでした。見本の顔だけ使えます。（理由: ${mpErr || '不明'}）`); return; }
+  if (slowNotice) { slowNotice = false; camError(); }
   pill(mode === 'demo' ? '見本の顔' : '準備完了（予備）', 'ok');
   if (mpErr) console.warn('using face-api fallback:', mpErr);
   if (pendingImage) { pendingImage = false; detectNow(512); }
