@@ -1028,7 +1028,7 @@ function emitFromTip(b, p) {
   for (let i = 0; i < 3; i++) { const a = (p.side > 0 ? 0 : Math.PI) + (r() - .5) * 1.4 + b.f.ang, sp = 120 + r() * 300; scrap(x, y + (r() - .5) * 60, Math.cos(a) * sp, Math.sin(a) * sp - 100, 0.05, false); }
 }
 // HOLD: a still beat before the effect, used only when recording a video
-const BUILD = 0.26, IMPACT_LEN = 0.39, REC_HOLD = 0.6;
+const BUILD = 0.35, IMPACT_LEN = 0.2, REC_HOLD = 0.6;
 let HOLD = 0, IMPACT_AT = BUILD;
 function setHold(h) { HOLD = h; IMPACT_AT = h + BUILD; }
 // check view: the outline the face sheet is cut to (yellow) and the detected landmarks (cyan)
