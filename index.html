@@ -63,6 +63,8 @@ button:hover, .btn:hover { border-color: var(--paper-dim); }
 button:focus-visible, .btn:focus-within, input:focus-visible { outline: 2px solid var(--ochre); outline-offset: 2px; }
 /* the big open button: cyan speed lines, a pair of original manga eyes and one kanji (開 / 閉); pressing inverts it */
 .open-row { display: flex; justify-content: center; margin-top: -2px; }
+.cam-err { align-self: center; max-width: 640px; width: 100%; font-size: 13px; line-height: 1.6; color: #ffd9cf; background: rgba(210,69,47,.14); border: 1px solid rgba(210,69,47,.55); border-radius: 6px; padding: 8px 12px; }
+.cam-err .en { display: block; color: #d9b8b0; font-size: 12px; margin-top: 2px; }
 #btnOpen { --glow: #fff; --inner-glow: #dbfdff; --cyan: #20c5df; --edge: #09708e; --ray: #07516c; --light-ray: #d1fbff; --letter: #fff; --outline: #090d15;
   position: relative; isolation: isolate; display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; justify-items: center; gap: 0;
   width: 100%; max-width: 700px; height: 82px; padding: 0 4%; overflow: hidden; border: 2px solid #090d15; border-radius: 6px;
@@ -189,10 +191,11 @@ kbd { font-family: var(--f-body); font-size: 11px; border: 1px solid currentColo
     </defs>
   </svg>
   <div class="open-row" id="openRow"><button id="btnOpen" type="button" aria-label="ひらく（Space キー）" title="Space キーでも開け閉めできます"><svg class="burst" aria-hidden="true" focusable="false"><use href="#kb-speed-lines"/></svg><svg class="eye" aria-hidden="true" focusable="false"><use href="#kb-eye"/></svg><span class="kanji" id="openLabel" aria-hidden="true">開</span><svg class="eye eye-right" aria-hidden="true" focusable="false"><use href="#kb-eye"/></svg></button></div>
+  <div class="cam-err" id="camErr" role="alert" hidden></div>
 
   <div class="bar">
     <div class="group">
-      <button id="btnCam" type="button">カメラ</button>
+      <button id="btnCam" type="button"><svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M4 7.5h3.2L9 5h6l1.8 2.5H20a1 1 0 0 1 1 1V18a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V8.5a1 1 0 0 1 1-1Z"/><circle cx="12" cy="13" r="3.6"/></svg>カメラ</button>
       <input id="snap" type="file" accept="image/*" capture="user" hidden>
       <label class="btn" for="file" title="ページのどこにでもドロップできます">写真を選ぶ／ドロップ<input id="file" type="file" accept="image/*"></label>
       <button id="btnRec" type="button">動画で保存</button>
@@ -203,7 +206,7 @@ kbd { font-family: var(--f-body); font-size: 11px; border: 1px solid currentColo
     </div>
     <form class="write" id="writeForm">
       <input id="ink" maxlength="40" placeholder="ページに書き込む（例：今日は早く寝る）" autocomplete="off">
-      <button type="submit">書く</button>
+      <button type="submit"><svg width="17" height="17" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round"><path d="M12 22 7.5 12.5 9 6h6l1.5 6.5L12 22Z"/><path d="M12 22v-8.2"/><circle cx="12" cy="11.6" r="1.3"/><path d="M9 6V3h6v3"/></svg>書く</button>
     </form>
   </div>
   <div class="samples" id="samples" role="group" aria-label="見本の顔"><span class="lbl">見本</span></div>
@@ -1577,6 +1580,7 @@ function buildSamples() {
 
 let pendingImage = false;
 async function loadImageEl(img, url) {
+    camError();
     stopVideo(); resetSource(); mode = 'image';
     const k = Math.min(1, 1400 / Math.max(img.width, img.height));
     src.width = Math.round(img.width * k); src.height = Math.round(img.height * k);
@@ -1602,6 +1606,7 @@ window.addEventListener('dragleave', e => { if (!hasFiles(e)) return; dragDepth 
 window.addEventListener('drop', e => { if (!hasFiles(e)) return; e.preventDefault(); dragDepth = 0; $('#drop').hidden = true; const fl = [...e.dataTransfer.files].find(f => f.type.startsWith('image/')); if (fl) useImage(fl); else msg('画像ファイルをドロップしてください。'); });
 
 $('#snap').addEventListener('change', e => useImage(e.target.files[0]));
+function camError(ja, en) { const e = $('#camErr'); if (!ja) { e.hidden = true; e.textContent = ''; return; } e.textContent = ja; const s = document.createElement('span'); s.className = 'en'; s.lang = 'en'; s.textContent = en; e.append(s); e.hidden = false; }
 $('#btnCam').addEventListener('click', async () => {
   // inside the claude.ai viewer live video is blocked, so take a selfie with the device camera instead
   let framed = false; try { framed = window.self !== window.top; } catch (_) { framed = true; }
@@ -1609,24 +1614,24 @@ $('#btnCam').addEventListener('click', async () => {
   // in-app browsers (X, Instagram, LINE, Facebook, other Android WebViews) block live video: take a selfie instead
   if (/TwitterAndroid|Twitter for|Instagram|FBAN|FBAV|Line\/|; wv\)/.test(navigator.userAgent)) {
     $('#snap').value = ''; $('#snap').click();
-    msg('アプリの中のブラウザでは動画のカメラが使えないので、写真を撮って試せます。動くカメラで遊ぶには、右上のメニューから「ブラウザで開く」を選んでください。');
+    camError('アプリの中のブラウザでは動画のカメラが使えないので、写真を撮って試せます。動くカメラで遊ぶには、右上のメニューから「ブラウザで開く」を選んでください。', 'Live camera does not work in in-app browsers, so you can take a photo instead. For the live camera, choose "Open in browser" from the menu at the top right.');
     return;
   }
   try {
     const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false });
-    stopVideo(); resetSource();
+    camError(); stopVideo(); resetSource();
     video = document.createElement('video'); video.playsInline = true; video.muted = true; video.srcObject = stream; await video.play();
     mode = 'video'; src.width = video.videoWidth || 1280; src.height = video.videoHeight || 720; faces = []; layout();
     msg(modelsReady ? '' : '顔認識モデルを読み込み中です…');
   } catch (err) {
     const n = err && err.name;
-    const why = !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia
-      ? 'このページの開き方ではカメラを使えません。ダウンロード版を Chrome か Edge で開いてください。'
-      : n === 'NotAllowedError' || n === 'SecurityError' ? 'カメラが許可されていません。アドレスバー左のアイコンからカメラを「許可」にして、もう一度押してください。（claude.ai の公開ページではカメラは使えません）'
-      : n === 'NotFoundError' || n === 'OverconstrainedError' ? 'カメラが見つかりません。接続を確認してください。'
-      : n === 'NotReadableError' || n === 'AbortError' ? 'カメラを他のアプリが使っています。ビデオ会議などを閉じてから、もう一度押してください。'
-      : `カメラを起動できませんでした（${n || '不明なエラー'}）。`;
-    msg(why + ' 写真を選んで試すこともできます。');
+    const [ja, en] = !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia
+      ? ['このページの開き方ではカメラを使えません。Chrome か Safari で開き直してください。', 'The camera is not available here. Please open this page in Chrome or Safari.']
+      : n === 'NotAllowedError' || n === 'SecurityError' ? ['カメラが許可されていません。アドレスバーのアイコンからカメラを「許可」にして、もう一度押してください。', 'Camera access is blocked. Allow the camera from the icon in the address bar, then press the button again.']
+      : n === 'NotFoundError' || n === 'OverconstrainedError' ? ['カメラが見つかりません。接続を確認してください。', 'No camera was found. Please check that one is connected.']
+      : n === 'NotReadableError' || n === 'AbortError' ? ['カメラを他のアプリが使っています。ビデオ会議などを閉じてから、もう一度押してください。', 'Another app is using the camera. Close it (e.g. a video call) and try again.']
+      : [`カメラを起動できませんでした（${n || '不明なエラー'}）。`, `The camera could not be started (${n || 'unknown error'}).`];
+    camError(ja + ' 写真を選んで試すこともできます。', en + ' You can also try with a photo.'); msg('');
   }
 });
 
