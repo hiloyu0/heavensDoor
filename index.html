@@ -65,7 +65,9 @@ button:focus-visible, .btn:focus-within, input:focus-visible { outline: 2px soli
 .open-row { display: flex; justify-content: center; margin-top: -2px; }
 .cam-err { align-self: center; max-width: 640px; width: 100%; font-size: 13px; line-height: 1.6; color: #ffd9cf; background: rgba(210,69,47,.14); border: 1px solid rgba(210,69,47,.55); border-radius: 6px; padding: 8px 12px; }
 .cam-err .en { display: block; color: #d9b8b0; font-size: 12px; margin-top: 2px; }
-.cam-err .cam-act { margin-top: 8px; font-size: 14px; color: #1a1020; background: #ffe2d8; border-color: #ffe2d8; font-weight: 700; }
+.cam-err .cam-acts { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.cam-err .cam-act.sub { color: #ffe2d8; background: transparent; border-color: rgba(255,226,216,.5); font-weight: 400; }
+.cam-err .cam-act { margin-top: 0; font-size: 14px; color: #1a1020; background: #ffe2d8; border-color: #ffe2d8; font-weight: 700; }
 #btnOpen { --glow: #fff; --inner-glow: #dbfdff; --cyan: #20c5df; --edge: #09708e; --ray: #07516c; --light-ray: #d1fbff; --letter: #fff; --outline: #090d15;
   position: relative; isolation: isolate; display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; justify-items: center; gap: 0;
   width: 100%; max-width: 700px; height: 82px; padding: 0 4%; overflow: hidden; border: 2px solid #090d15; border-radius: 6px;
@@ -1608,7 +1610,13 @@ window.addEventListener('drop', e => { if (!hasFiles(e)) return; e.preventDefaul
 function camError(ja, en, action) {
   const e = $('#camErr'); if (!ja) { e.hidden = true; e.textContent = ''; return; }
   e.textContent = ja; const s = document.createElement('span'); s.className = 'en'; s.lang = 'en'; s.textContent = en; e.append(s);
-  if (action) { const b = document.createElement('button'); b.type = 'button'; b.className = 'cam-act'; b.textContent = action.label; b.addEventListener('click', action.run); e.append(b); }
+  if (action) {
+    const row = document.createElement('div'); row.className = 'cam-acts';
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'cam-act'; b.textContent = action.label; b.addEventListener('click', action.run); row.append(b);
+    const c = document.createElement('button'); c.type = 'button'; c.className = 'cam-act sub'; c.textContent = 'URL をコピー / Copy link';
+    c.addEventListener('click', async () => { const url = PUBLIC_URL; try { await navigator.clipboard.writeText(url); c.textContent = 'コピーしました / Copied'; } catch (_) { prompt('このURLをブラウザに貼り付けてください / Paste this URL into your browser', url); } });
+    row.append(c); e.append(row);
+  }
   e.hidden = false;
 }
 // leave an in-app browser (X, LINE, Instagram…) or an embedding page for the real browser, where the live camera works
@@ -1620,7 +1628,8 @@ function openInBrowser() {
   if (/Line\//.test(ua)) { location.href = url + (url.includes('?') ? '&' : '?') + 'openExternalBrowser=1'; return; }
   if (/Android/.test(ua) && !framed) {
     const u = new URL(url);
-    location.href = `intent://${u.host}${u.pathname}${u.search}#Intent;scheme=https;package=com.android.chrome;S.browser_fallback_url=${encodeURIComponent(url)};end`;
+    // no package: Android hands the link to the default browser instead of insisting on Chrome
+    location.href = `intent://${u.host}${u.pathname}${u.search}#Intent;scheme=https;action=android.intent.action.VIEW;category=android.intent.category.BROWSABLE;end`;
     return;
   }
   if (/iPhone|iPad|iPod/.test(ua) && !framed) { location.href = 'x-safari-' + url; return; }
@@ -1639,8 +1648,8 @@ $('#btnCam').addEventListener('click', async () => {
   } catch (err) {
     const n = err && err.name;
     if (inApp || framed) {
-      camError(inApp ? 'アプリの中のブラウザではカメラが使えないことがあります。下のボタンで Chrome や Safari で開き直してください。' : 'このページの中ではカメラが使えません。下のボタンでかおほんのページを開いてください。',
-        inApp ? 'The camera may not work in in-app browsers. Use the button below to reopen this page in Chrome or Safari.' : 'The camera cannot be used inside this embedded page. Use the button below to open kaohon directly.',
+      camError(inApp ? 'アプリの中のブラウザではカメラが使えないことがあります。下のボタンでブラウザで開き直すか、URL をコピーしてブラウザに貼り付けてください。' : 'このページの中ではカメラが使えません。下のボタンでかおほんのページを開いてください。',
+        inApp ? 'The camera may not work in in-app browsers. Reopen this page in your browser with the button below, or copy the link and paste it into your browser.' : 'The camera cannot be used inside this embedded page. Use the button below to open kaohon directly.',
         { label: 'ブラウザで開く / Open in browser', run: openInBrowser });
       msg(''); return;
     }
