@@ -1034,8 +1034,8 @@ function emitFromTip(b, p) {
   const [x, y] = tipScreen(b, p), r = Math.random;
   for (let i = 0; i < 3; i++) { const a = (p.side > 0 ? 0 : Math.PI) + (r() - .5) * 1.4 + b.f.ang, sp = 120 + r() * 300; scrap(x, y + (r() - .5) * 60, Math.cos(a) * sp, Math.sin(a) * sp - 100, 0.05, false); }
 }
-// HOLD: a still beat before the effect, used only when recording a video
-const BUILD = 0.35, IMPACT_LEN = 0.2, REC_HOLD = 0.6;
+// HOLD: optional still beat inside the effect clock (0; the video gets its lead-in from REC_LEAD instead)
+const BUILD = 0.35, IMPACT_LEN = 0.2, REC_LEAD = 2, REC_TAIL = 2.6;
 let HOLD = 0, IMPACT_AT = BUILD;
 function setHold(h) { HOLD = h; IMPACT_AT = h + BUILD; }
 // check view: the outline the face sheet is cut to (yellow) and the detected landmarks (cyan)
@@ -1055,7 +1055,7 @@ function drawOutlines() {
 function drawFx(t, dt) {
   fxx.setTransform(dpr, 0, 0, dpr, 0, 0); fxx.clearRect(0, 0, dispW, dispH);
   U.uImpact.value = 0;
-  if (!books.length && (!sfxState) && t - hudHold > 0.3) {
+  if (!books.length && (!sfxState) && !rec && t - hudHold > 0.3) {
     for (const fc of faces) {
       const f = fc.frame, cr = f.core, pul = 0.5 + 0.5 * Math.sin(t * 3);
       const pad = 10, corners = [[cr.minX - pad, cr.minY - pad], [cr.maxX + pad, cr.minY - pad], [cr.maxX + pad, cr.maxY + pad], [cr.minX - pad, cr.maxY + pad]].map(([x, y]) => toDisp(f, x, y));
@@ -1344,13 +1344,13 @@ async function recordEffect() {
   const chunks = []; mr.ondataavailable = e => { if (e.data && e.data.size) chunks.push(e.data); };
   rec = mr; btn.disabled = true; btn.textContent = '録画中…'; msg('めくれるところを録画しています（約5秒）。');
   const done = new Promise(r => { mr.onstop = r; });
-  // build the book first, then record from the moment the effect clock starts until it has settled
-  setHold(REC_HOLD); openAll();
-  if (!books.length) { setHold(0); rec = null; btn.disabled = false; btn.textContent = '動画で保存'; return; }
+  // record the still face for a moment first (real frames, so phones keep it), then open, and stop soon after the pages settle
   mr.start(250);
-  const t0 = fxState ? fxState.t0 : now(), wall = performance.now();
-  await new Promise(r => { const tick = () => (now() - t0 > HOLD + 4.3 || performance.now() - wall > 20000) ? r() : requestAnimationFrame(tick); tick(); });
-  mr.stop(); await done; rec = null; recTrack = null; setHold(0);
+  const waitUntil = cond => new Promise(r => { const w0 = performance.now(); const tick = () => (cond() || performance.now() - w0 > 20000) ? r() : requestAnimationFrame(tick); tick(); });
+  const w1 = performance.now(); await waitUntil(() => performance.now() - w1 > REC_LEAD * 1000);
+  openAll();
+  if (books.length) { const t0 = fxState ? fxState.t0 : now(); await waitUntil(() => now() - t0 > REC_TAIL); }
+  mr.stop(); await done; rec = null; recTrack = null;
   btn.disabled = false; btn.textContent = '動画で保存';
   const type = (mr.mimeType || mime || 'video/webm').split(';')[0], blob = new Blob(chunks, { type });
   await saveVideo(blob, type.includes('mp4') ? 'mp4' : 'webm');
@@ -1452,8 +1452,8 @@ const SAMPLES = [
   { id: 'face-09', label: '斜め' },
   { id: 'face-10', label: 'スカーフ' },
   { id: 'face-11', label: '眼鏡' },
-  { id: 'face-13', label: 'アニメ・女子' },
-  { id: 'face-14', label: 'アニメ・青年' },
+  { id: 'face-13', label: 'アニメ・女子（試験的）' },
+  { id: 'face-14', label: 'アニメ・青年（試験的）' },
   { id: 'face-16', label: '3D・女の子' },
   { id: 'face-17', label: '3D・女性' }
 ];
