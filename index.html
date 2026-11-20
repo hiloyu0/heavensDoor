@@ -75,6 +75,11 @@ kbd { font-family: var(--f-body); font-size: 11px; border: 1px solid currentColo
 .write input { flex: 1; min-width: 0; font-family: var(--f-hand); font-size: 17px; color: var(--paper); background: transparent; border: none; border-bottom: 1px solid var(--line); padding: 6px 2px; }
 .write input::placeholder { color: #7d7389; }
 .write button { color: var(--shu); border-color: color-mix(in srgb, var(--shu) 50%, var(--line)); }
+.notes { font-size: 12px; color: var(--paper-dim); line-height: 1.75; border-top: 1px solid var(--line); padding-top: 10px; }
+.notes summary { cursor: pointer; letter-spacing: .08em; }
+.notes ul { margin: 6px 0 0; padding-left: 1.3em; }
+.notes li { margin: 2px 0; }
+.notes .lic { margin-top: 6px; opacity: .85; }
 #msg { font-size: 13px; color: var(--paper-dim); margin: 0; min-height: 1.4em; line-height: 1.6; }
 @media (max-width: 560px) { h1 { font-size: 24px; } h1 small { display: block; margin: 6px 0 0; } }
 </style>
@@ -114,6 +119,16 @@ kbd { font-family: var(--f-body); font-size: 11px; border: 1px solid currentColo
   </div>
   <div class="samples" id="samples" role="group" aria-label="見本の顔"><span class="lbl">見本</span></div>
   <p id="msg"></p>
+  <details class="notes" open>
+    <summary>このアプリについて</summary>
+    <ul>
+      <li>写真やカメラの映像は、このブラウザの中だけで処理します。サーバーに送ったり保存したりはしません。</li>
+      <li>自分以外の人の顔を使うときは、必ず本人の許可を取ってください。できた画像や動画を公開するときも同じです。</li>
+      <li>見本の人物は、すべて AI で生成した架空の人物です。実在の人とは関係ありません。</li>
+      <li>顔をめくる表現はフィクションの演出です。</li>
+    </ul>
+    <div class="lic">使用しているもの：three.js（MIT License）、MediaPipe（Apache License 2.0）、face-api.js（MIT License）、Google Fonts の Dela Gothic One・Zen Kaku Gothic New・Zen Kurenaido（SIL Open Font License 1.1）</div>
+  </details>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -1273,6 +1288,17 @@ function composeRecFrame() {
       recCtx.restore();
     }
   }
+  drawWatermark(w, h);
+}
+const WM_URL = /\.github\.io$/.test(location.hostname) ? (location.host + location.pathname).replace(/\/(index\.html)?$/, '') : '';
+function drawWatermark(w, h) {
+  const fs = Math.max(14, Math.round(h * 0.034)), pad = Math.round(fs * 0.7);
+  recCtx.save(); recCtx.textAlign = 'right'; recCtx.textBaseline = 'alphabetic';
+  recCtx.shadowColor = 'rgba(0,0,0,0.75)'; recCtx.shadowBlur = fs * 0.35;
+  let y = h - pad;
+  if (WM_URL) { recCtx.font = `${Math.round(fs * 0.55)}px "Zen Kaku Gothic New", sans-serif`; recCtx.fillStyle = 'rgba(255,248,234,0.8)'; recCtx.fillText(WM_URL, w - pad, y); y -= fs * 0.8; }
+  recCtx.font = `${fs}px "Dela Gothic One", sans-serif`; recCtx.fillStyle = 'rgba(255,248,234,0.88)'; recCtx.fillText('かおほん', w - pad, y);
+  recCtx.restore();
 }
 function pickMime() {
   const c = ['video/mp4;codecs=avc1.42E01E,mp4a.40.2', 'video/mp4', 'video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm'];
@@ -1416,7 +1442,12 @@ const SAMPLES = [
   { id: 'face-09', label: '斜め' },
   { id: 'face-10', label: 'スカーフ' },
   { id: 'face-11', label: '眼鏡' },
-  { id: 'face-12', label: 'サングラス' }
+  { id: 'face-12', label: 'サングラス' },
+  { id: 'face-13', label: 'アニメ・女子' },
+  { id: 'face-14', label: 'アニメ・青年' },
+  { id: 'face-15', label: 'アニメ・少年' },
+  { id: 'face-16', label: '3D・女の子' },
+  { id: 'face-17', label: '3D・女性' }
 ];
 const sampleUrl = id => (window.__KAO_SAMPLES && window.__KAO_SAMPLES[id]) || `samples/${id}.jpg`;
 function markSample(id) { document.querySelectorAll('#samples button').forEach(b => b.setAttribute('aria-pressed', b.dataset.id === id)); }
