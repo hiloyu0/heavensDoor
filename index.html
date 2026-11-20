@@ -743,7 +743,7 @@ function updateBook(b, t, dt) {
     let tgt;
     if (opening) {
       if (el < p.delay - 0.14) tgt = 0;
-      else if (el < p.delay) tgt = p.isCover ? 0.07 * smooth(HOLD + 0.27, p.delay, el) : 0;
+      else if (el < p.delay) tgt = p.isCover ? 0.07 * smooth(HOLD + BUILD * 0.45, p.delay, el) : 0;
       else {
         let target = p.target;
         if (b.mode !== 'double' && target > Math.PI / 2) target = Math.max(Math.min(target, 2.0), Math.PI / 2 + (target - Math.PI / 2) * b.fit);
@@ -797,11 +797,11 @@ function updateBook(b, t, dt) {
       if (sx < mg * 2.5 || sx > dispW - mg * 2.5 || sy < mg * 2.5 || sy > dispH - mg * 2.5) roomy = false; } }
     if (out) b.fit = Math.max(0.25, b.fit - dt * 0.9); else if (roomy) b.fit = Math.min(1, b.fit + dt * 0.2);
   }
-  if (opening && el > 2.9) b.state = 'open';
+  if (opening && el > 2.8) b.state = 'open';
   if (!opening && el > 0.4 && settled) b.state = 'closed';
   // vermilion handwriting, a dozen characters a second
   const total = inkTotal();
-  if (opening && el > 1.9 && b.inkShown < total) {
+  if (opening && el > 1.8 && b.inkShown < total) {
     b.inkT += dt; const n = Math.min(total, Math.floor(b.inkT * 14));
     if (n !== b.inkShown) { b.inkShown = n; renderBase(b, n); }
   }
@@ -1027,7 +1027,7 @@ function emitFromTip(b, p) {
   const [x, y] = tipScreen(b, p), r = Math.random;
   for (let i = 0; i < 3; i++) { const a = (p.side > 0 ? 0 : Math.PI) + (r() - .5) * 1.4 + b.f.ang, sp = 120 + r() * 300; scrap(x, y + (r() - .5) * 60, Math.cos(a) * sp, Math.sin(a) * sp - 100, 0.05, false); }
 }
-const HOLD = 0.5, IMPACT_AT = HOLD + 0.6, IMPACT_LEN = 0.05;
+const HOLD = 0.6, BUILD = 0.35, IMPACT_AT = HOLD + BUILD, IMPACT_LEN = 0.09;
 // check view: the outline the face sheet is cut to (yellow) and the detected landmarks (cyan)
 function drawOutlines() {
   const list = books.length ? books.map(b => b.f) : faces.map(fc => fc.frame);
@@ -1080,7 +1080,7 @@ function drawFx(t, dt) {
           const nUse = Math.max(2, Math.ceil(edge.length * q)), path = edge.slice(0, nUse);
           const [bx2, by2] = path[path.length - 1];
           fxx.save(); fxx.globalAlpha = fade; fxx.lineCap = 'round'; fxx.lineJoin = 'round';
-          fxx.strokeStyle = impact ? '#ffffff' : `rgba(255,244,220,${(0.45 + 0.45 * q).toFixed(2)})`; fxx.shadowColor = impact ? '#ffffff' : '#ffe2a8'; fxx.shadowBlur = 12 + 14 * q; fxx.lineWidth = 2 + 4 * smooth(HOLD + 0.3, IMPACT_AT, e);
+          fxx.strokeStyle = impact ? '#ffffff' : `rgba(255,244,220,${(0.45 + 0.45 * q).toFixed(2)})`; fxx.shadowColor = impact ? '#ffffff' : '#ffe2a8'; fxx.shadowBlur = 12 + 14 * q; fxx.lineWidth = 2 + 4 * smooth(HOLD + BUILD * 0.5, IMPACT_AT, e);
           fxx.beginPath(); path.forEach(([x, y], i) => i ? fxx.lineTo(x, y) : fxx.moveTo(x, y)); fxx.stroke();
           fxx.shadowBlur = 0; fxx.strokeStyle = '#fffaf0'; fxx.lineWidth = 1.4; fxx.stroke();
           // spark at the leading point
@@ -1107,7 +1107,7 @@ function drawFx(t, dt) {
       // a small pre-hit pulse
       if (e < 0.1) { fxx.fillStyle = `rgba(255,240,210,${0.25 * (1 - e / 0.1)})`; fxx.fillRect(0, 0, dispW, dispH); }
       // directional shake along the split
-      if (e < IMPACT_AT) { const k = smooth(HOLD + 0.18, IMPACT_AT, e); shakeX = (Math.random() - 0.5) * 3 * k; shakeY = (Math.random() - 0.5) * 3 * k; }
+      if (e < IMPACT_AT) { const k = smooth(HOLD + BUILD * 0.3, IMPACT_AT, e); shakeX = (Math.random() - 0.5) * 3 * k; shakeY = (Math.random() - 0.5) * 3 * k; }
       if (e > IMPACT_AT) { const d = e - IMPACT_AT; const amp = 11 * Math.exp(-d * 7); shakeX = amp * Math.sin(d * 72); shakeY = amp * 0.25 * Math.sin(d * 51 + 1); }
       if (e > 2.6) fxState = null;
     } else if (fxState.kind === 'close') {
@@ -1197,7 +1197,7 @@ function sndOpen() {
   noise(HOLD, IMPACT_AT - HOLD, 400, 4200, 0.18, 'bandpass', 2.5);          // rising tear
   thump(IMPACT_AT, 0.6); noise(IMPACT_AT, 0.16, 6000, 2500, 0.35, 'highpass', 0.5);
   [0.01, 0.15, 0.23, 0.3, 0.36, 0.41].forEach((d, i) => paperFlip(IMPACT_AT + d + Math.random() * 0.015, i === 0 ? 0.3 : 0.2 + Math.random() * 0.06));
-  [2.1, 2.18, 2.25].forEach(d => paperFlip(d + Math.random() * 0.03, 0.12));   // the pages settle
+  [2.0, 2.08, 2.15].forEach(d => paperFlip(d + Math.random() * 0.03, 0.12));   // the pages settle
 }
 function sndClose() { for (let i = 0; i < 5; i++) paperFlip(i * 0.04 + Math.random() * 0.01, 0.16); noise(0.4, 0.16, 1200, 250, 0.45, 'lowpass', 0.7); thump(0.42, 0.35); }
 
@@ -1442,7 +1442,6 @@ const SAMPLES = [
   { id: 'face-09', label: '斜め' },
   { id: 'face-10', label: 'スカーフ' },
   { id: 'face-11', label: '眼鏡' },
-  { id: 'face-12', label: 'サングラス' },
   { id: 'face-13', label: 'アニメ・女子' },
   { id: 'face-14', label: 'アニメ・青年' },
   { id: 'face-15', label: 'アニメ・少年' },
