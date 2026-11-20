@@ -61,29 +61,26 @@ h1 small { font-family: var(--f-body); font-size: 13px; letter-spacing: .08em; c
 button, .btn { font: inherit; font-size: 14px; color: var(--paper); background: var(--ink-2); border: 1px solid var(--line); padding: 9px 14px; border-radius: 6px; cursor: pointer; display: inline-flex; align-items: center; gap: 7px; letter-spacing: .04em; position: relative; }
 button:hover, .btn:hover { border-color: var(--paper-dim); }
 button:focus-visible, .btn:focus-within, input:focus-visible { outline: 2px solid var(--ochre); outline-offset: 2px; }
-/* the big open button: bold manga-cover feel (thick ink outline, hard offset shadow, halftone, gold on violet) */
+/* the big open button: speed lines converge on the label; pressing flips it to white like the inversion flash */
 .open-row { display: flex; justify-content: center; margin-top: -2px; }
-#btnOpen { width: 100%; justify-content: center; font-family: var(--f-display); font-size: clamp(22px, 5.4vw, 34px); letter-spacing: .5em; text-indent: .5em;
-  padding: 12px 18px 13px; color: #ffe27a; border: 3px solid #0d0812; border-radius: 4px; transform: skewX(-8deg);
-  background:
-    radial-gradient(circle at 1px 1px, rgba(255,255,255,.16) 1.1px, transparent 1.6px) 0 0 / 7px 7px,
-    linear-gradient(100deg, #2a0f4a 0%, #5b1b78 45%, #8a1f6a 75%, #3a0f3c 100%);
-  box-shadow: 6px 6px 0 #0d0812, 6px 6px 0 2px #c99a2e;
-  text-shadow: 2px 2px 0 #0d0812, -1px -1px 0 #0d0812, 1px -1px 0 #0d0812, -1px 1px 0 #0d0812, 4px 4px 0 rgba(210,69,47,.85);
-  transition: transform .08s, box-shadow .08s, filter .15s; }
-#btnOpen > * { display: inline-block; transform: skewX(8deg); }
-#btnOpen kbd { letter-spacing: 0; text-indent: 0; color: #ffe27a; text-shadow: none; position: absolute; right: 14px; top: 50%; transform: translateY(-50%) skewX(8deg); }
-#btnOpen:hover { filter: brightness(1.12) saturate(1.1); }
-#btnOpen:active { transform: skewX(-8deg) translate(4px, 4px); box-shadow: 2px 2px 0 #0d0812, 2px 2px 0 2px #c99a2e; }
-#btnOpen:focus-visible { outline: 3px solid #ffe27a; outline-offset: 4px; }
+#btnOpen { --sl: #b8b6b1; width: 100%; min-height: 64px; justify-content: center; isolation: isolate; overflow: hidden;
+  font-family: var(--f-display); font-size: clamp(26px, 6vw, 34px); line-height: 1.15; letter-spacing: .06em;
+  padding: 8px 0 11px; color: #f5f2e9; background: #171619; border: 1px solid #918c94; border-radius: 2px; transition: background .12s, color .12s, border-color .12s; }
+#btnOpen::before, #btnOpen::after { content: ""; position: absolute; top: 13px; bottom: 13px; left: 0; width: 32%; background: var(--sl); z-index: -1;
+  clip-path: polygon(0 0, 100% 34%, 0 7%, 0 37%, 72% 48%, 0 41%, 0 66%, 81% 62%, 0 73%, 0 96%, 100% 72%, 0 100%); transition: background .12s; }
+#btnOpen::after { left: auto; right: 0; transform: rotate(180deg); }
+#btnOpen kbd { position: absolute; right: 10px; bottom: 6px; font-size: 10px; letter-spacing: 0; color: #918c94; border-color: #4a4650; background: #171619; }
+#btnOpen:hover { --sl: #f5f2e9; border-color: #f5f2e9; background: #2b292d; }
+#btnOpen:active { --sl: #171619; color: #171619; background: #f5f2e9; }
+#btnOpen:focus-visible { outline: 2px solid #f5f2e9; outline-offset: 4px; }
 kbd { font-family: var(--f-body); font-size: 11px; border: 1px solid currentColor; border-radius: 3px; padding: 0 4px; opacity: .7; }
 @media (hover: none) { kbd { display: none; } }
 .btn input { position: absolute; width: 1px; height: 1px; opacity: 0; }
-.samples { display: flex; gap: 8px; align-items: center; overflow-x: auto; padding-bottom: 2px; }
-.samples .lbl { font-size: 12px; letter-spacing: .12em; color: var(--paper-dim); flex: none; }
-.samples button { flex: none; padding: 4px 10px 4px 4px; gap: 8px; font-size: 13px; }
-.samples button img { width: 44px; height: 54px; object-fit: cover; border-radius: 4px; display: block; }
-.samples button .two { display: flex; flex-direction: column; line-height: 1.25; }
+.samples { display: flex; gap: 8px; align-items: flex-start; overflow-x: auto; padding-bottom: 2px; }
+.samples .lbl { font-size: 12px; letter-spacing: .12em; color: var(--paper-dim); flex: none; align-self: center; }
+.samples button { flex: none; flex-direction: column; align-items: center; padding: 4px 4px 6px; gap: 4px; font-size: 12px; width: 76px; text-align: center; line-height: 1.3; }
+.samples button img { width: 66px; height: 80px; object-fit: cover; border-radius: 4px; display: block; }
+.samples button .two { display: flex; flex-direction: column; align-items: center; line-height: 1.25; }
 .samples button .two small { font-size: 10px; color: var(--paper-dim); letter-spacing: .08em; }
 .samples button[aria-pressed="true"] { border-color: var(--ochre); box-shadow: inset 0 0 0 1px var(--ochre); }
 .write { display: flex; gap: 8px; flex: 1 1 320px; min-width: 0; max-width: 460px; }
@@ -1491,7 +1488,7 @@ function buildSamples() {
   const row = $('#samples');
   for (const s of SAMPLES) {
     const b = document.createElement('button'); b.type = 'button'; b.dataset.id = s.id; b.setAttribute('aria-pressed', s.id === DEFAULT_SAMPLE);
-    const img = document.createElement('img'); img.alt = ''; img.width = 44; img.height = 54;
+    const img = document.createElement('img'); img.alt = ''; img.width = 66; img.height = 80;
     if (s.id === 'demo') { const c = mk(88, 108); c.getContext('2d').drawImage(src, 180, 220, 440, 540, 0, 0, 88, 108); img.src = c.toDataURL('image/jpeg', 0.85); }
     else { img.src = sampleUrl(s.id); img.onerror = () => b.remove(); }
     const t = document.createElement('span'); t.textContent = s.label;
