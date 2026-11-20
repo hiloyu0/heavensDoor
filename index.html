@@ -594,7 +594,7 @@ function createBook(face, idx) {
   const rimW = rimOf(mW, Math.max(2, ts * 1.6), 'rgba(110,78,50,0.15)'), rimWf = rimOf(mWf, Math.max(2, ts * 1.6), 'rgba(110,78,50,0.14)');
   const box = { left: w * 0.05, right: w * 0.95, top: 0, bottom: h };
   // the cut edge around each hole: a bright paper edge
-  const cutEdge = (c, flip) => { const x = c.getContext('2d'); x.save(); x.globalCompositeOperation = 'source-atop'; x.strokeStyle = 'rgba(255,248,232,0.85)'; x.lineWidth = Math.max(1, ts * 1.0); drawHoles(x, holes, f, ts, flip ? w : 0, 1.04, hf.sx); x.stroke(); x.strokeStyle = 'rgba(90,60,40,0.1)'; x.lineWidth = Math.max(1, ts * 0.7); drawHoles(x, holes, f, ts, flip ? w : 0, 1.1, hf.sx); x.stroke(); x.restore(); };
+  const cutEdge = (c, flip) => { const x = c.getContext('2d'); x.save(); x.globalCompositeOperation = 'source-atop'; x.strokeStyle = 'rgba(255,248,232,0.85)'; x.lineWidth = Math.max(1, ts * 1.0); drawHoles(x, holes, f, ts, flip ? w : 0, 1.04, hf.sx); x.stroke();  x.restore(); };
   for (let k = 0; k <= NPAGES; k++) {
     const isCover = k === NPAGES;
     let front, frontW = null, backW = null, back = mk(w, h); const bx = back.getContext('2d');
@@ -604,13 +604,12 @@ function createBook(face, idx) {
       vText(x, [{ t: pick(10).join('。') }], box, fsz * (0.9 + r() * 0.2), 'rgba(40,28,30,0.85)', seed + k * 7 + hf.side, null, B);
       // every page has the holes while it lies over the face (so the eyes show through);
       // deeper pages swap to whole paper once they stand out in the fan
-      { frontW = mk(w, h); frontW.getContext('2d').drawImage(front, 0, 0); maskWith(frontW, mW); atop(frontW, rimW); }
-      maskWith(front, m); atop(front, rim); if (k >= NPAGES - 1) cutEdge(front, false);
+      // a page with holes has them on both sides, all the way through the fan
+      maskWith(front, m); atop(front, rim); cutEdge(front, false);
     }
     paper(bx, w, h, seed + k * 17 + 5 + hf.side, (k + 1) % 2);
     vText(bx, [{ t: pick(12).join('。') }], box, fsz * (0.85 + r() * 0.15), 'rgba(28,20,24,0.95)', seed + k * 13 + hf.side, null, Bf);
-    if (!isCover) { backW = mk(w, h); backW.getContext('2d').drawImage(back, 0, 0); maskWith(backW, mWf); atop(backW, rimWf); }
-    maskWith(back, mf); atop(back, rimF); if (k >= NPAGES - 1) cutEdge(back, true);
+    maskWith(back, mf); atop(back, rimF); cutEdge(back, true);
     const geom = pageGeom(hf.side), sgeom = new THREE.BufferGeometry();
     sgeom.setIndex(geom.getIndex()); sgeom.setAttribute('uv', geom.attributes.uv);
     sgeom.setAttribute('position', new THREE.BufferAttribute(new Float32Array(geom.attributes.position.array.length), 3));
