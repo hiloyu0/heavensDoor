@@ -1606,6 +1606,12 @@ $('#btnCam').addEventListener('click', async () => {
   // inside the claude.ai viewer live video is blocked, so take a selfie with the device camera instead
   let framed = false; try { framed = window.self !== window.top; } catch (_) { framed = true; }
   if (framed) { $('#snap').value = ''; $('#snap').click(); msg('カメラで顔を撮ると、その写真で本がひらけます。'); return; }
+  // in-app browsers (X, Instagram, LINE, Facebook, other Android WebViews) block live video: take a selfie instead
+  if (/TwitterAndroid|Twitter for|Instagram|FBAN|FBAV|Line\/|; wv\)/.test(navigator.userAgent)) {
+    $('#snap').value = ''; $('#snap').click();
+    msg('アプリの中のブラウザでは動画のカメラが使えないので、写真を撮って試せます。動くカメラで遊ぶには、右上のメニューから「ブラウザで開く」を選んでください。');
+    return;
+  }
   try {
     const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false });
     stopVideo(); resetSource();
