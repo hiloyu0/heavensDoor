@@ -61,18 +61,24 @@ h1 small { font-family: var(--f-body); font-size: 13px; letter-spacing: .08em; c
 button, .btn { font: inherit; font-size: 14px; color: var(--paper); background: var(--ink-2); border: 1px solid var(--line); padding: 9px 14px; border-radius: 6px; cursor: pointer; display: inline-flex; align-items: center; gap: 7px; letter-spacing: .04em; position: relative; }
 button:hover, .btn:hover { border-color: var(--paper-dim); }
 button:focus-visible, .btn:focus-within, input:focus-visible { outline: 2px solid var(--ochre); outline-offset: 2px; }
-/* the big open button: speed lines converge on the label; pressing flips it to white like the inversion flash */
+/* the big open button: cyan speed lines, a pair of original manga eyes and one kanji (開 / 閉); pressing inverts it */
 .open-row { display: flex; justify-content: center; margin-top: -2px; }
-#btnOpen { --sl: #b8b6b1; width: 100%; min-height: 64px; justify-content: center; isolation: isolate; overflow: hidden;
-  font-family: var(--f-display); font-size: clamp(26px, 6vw, 34px); line-height: 1.15; letter-spacing: .06em;
-  padding: 8px 0 11px; color: #f5f2e9; background: #171619; border: 1px solid #918c94; border-radius: 2px; transition: background .12s, color .12s, border-color .12s; }
-#btnOpen::before, #btnOpen::after { content: ""; position: absolute; top: 13px; bottom: 13px; left: 0; width: 32%; background: var(--sl); z-index: -1;
-  clip-path: polygon(0 0, 100% 34%, 0 7%, 0 37%, 72% 48%, 0 41%, 0 66%, 81% 62%, 0 73%, 0 96%, 100% 72%, 0 100%); transition: background .12s; }
-#btnOpen::after { left: auto; right: 0; transform: rotate(180deg); }
-#btnOpen kbd { position: absolute; right: 10px; bottom: 6px; font-size: 10px; letter-spacing: 0; color: #918c94; border-color: #4a4650; background: #171619; }
-#btnOpen:hover { --sl: #f5f2e9; border-color: #f5f2e9; background: #2b292d; }
-#btnOpen:active { --sl: #171619; color: #171619; background: #f5f2e9; }
-#btnOpen:focus-visible { outline: 2px solid #f5f2e9; outline-offset: 4px; }
+#btnOpen { --glow: #fff; --inner-glow: #dbfdff; --cyan: #20c5df; --edge: #09708e; --ray: #07516c; --light-ray: #d1fbff; --letter: #fff; --outline: #090d15;
+  position: relative; isolation: isolate; display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; justify-items: center; gap: 0;
+  width: 100%; max-width: 700px; height: 82px; padding: 0 4%; overflow: hidden; border: 2px solid #090d15; border-radius: 6px;
+  background: radial-gradient(ellipse 72% 135% at 50% 50%, var(--glow) 7%, var(--inner-glow) 22%, var(--cyan) 56%, var(--edge) 100%);
+  box-shadow: inset 0 0 0 1px #ffffff50, 0 4px 0 #08070d; cursor: pointer; touch-action: manipulation; letter-spacing: 0; }
+#btnOpen .burst { position: absolute; z-index: -1; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+#btnOpen .ink-rays { fill: var(--ray); }
+#btnOpen .light-rays { fill: var(--light-ray); }
+#btnOpen .eye { display: block; width: min(100%, 144px); height: 70px; overflow: hidden; pointer-events: none; opacity: .28; mix-blend-mode: multiply; transition: opacity .2s; }
+@media (hover: hover) { #btnOpen:hover .eye { opacity: .42; } }
+#btnOpen .eye-right { transform: scaleX(-1); }
+#btnOpen .kanji { color: var(--letter); font: 52px/1 var(--f-display); -webkit-text-stroke: 4px var(--outline); paint-order: stroke fill; transform: translateY(2px); }
+@media (hover: hover) { #btnOpen:hover { --cyan: #48e1f4; --edge: #0b8eae; box-shadow: inset 0 0 0 1px #ffffff80, 0 4px 0 #08070d, 0 0 18px #20c5df40; } }
+#btnOpen:focus-visible { outline: 2px solid #a5f6ff; outline-offset: 4px; }
+#btnOpen:active { --glow: #080808; --inner-glow: #1c1c1c; --cyan: #444; --edge: #111; --ray: #050505; --light-ray: #fff; --letter: #090909; --outline: #fff; transform: translateY(3px); box-shadow: inset 0 0 0 1px #ffffff60, 0 1px 0 #08070d; }
+#btnOpen:active .eye { filter: grayscale(1); }
 kbd { font-family: var(--f-body); font-size: 11px; border: 1px solid currentColor; border-radius: 3px; padding: 0 4px; opacity: .7; }
 @media (hover: none) { kbd { display: none; } }
 .btn input { position: absolute; width: 1px; height: 1px; opacity: 0; }
@@ -114,7 +120,75 @@ kbd { font-family: var(--f-body); font-size: 11px; border: 1px solid currentColo
     </div>
   </div>
 
-  <div class="open-row" id="openRow"><button id="btnOpen" type="button"><span id="openLabel">ひらく</span><kbd>Space</kbd></button></div>
+  <svg class="kb-defs" style="position:absolute;width:0;height:0;overflow:hidden" width="0" height="0" aria-hidden="true" focusable="false">
+    <defs>
+      <path id="kb-eye-opening" d="M9 31 C22 16 40 10 57 12 C78 13 96 24 109 37 C94 49 76 54 57 53 C35 52 19 44 9 31Z"/>
+      <clipPath id="kb-eye-clip"><use href="#kb-eye-opening"/></clipPath>
+      <linearGradient id="kb-sclera" x2="0" y2="100%">
+        <stop stop-color="#87a5ad"/>
+        <stop offset=".58" stop-color="#f7ffff"/>
+      </linearGradient>
+      <linearGradient id="kb-iris" x2="0" y2="100%">
+        <stop offset=".24" stop-color="#103f32"/>
+        <stop offset=".62" stop-color="#24975a"/>
+        <stop offset="1" stop-color="#b1ef72"/>
+      </linearGradient>
+      <symbol id="kb-eye" viewBox="0 0 116 62">
+        <use href="#kb-eye-opening" fill="url(#kb-sclera)" stroke="#090d15" stroke-width="3"/>
+        <g clip-path="url(#kb-eye-clip)">
+          <circle cx="65" cy="32" r="20" fill="url(#kb-iris)" stroke="#090d15" stroke-width="3"/>
+          <path d="m49 38 5-2m-2 8 5-4m1 8 3-5m4 7 1-6m6 4-2-5m8 1-4-4m8-2-5-2"
+            fill="none" stroke="#b1ef72" stroke-width="1.4" stroke-linecap="round"/>
+          <ellipse cx="65" cy="31" rx="8" ry="11" fill="#090d15"/>
+          <ellipse cx="60" cy="24" rx="6.5" ry="4.5" transform="rotate(-22 60 24)" fill="#f7ffff"/>
+          <circle cx="73" cy="37" r="2.5" fill="#f7ffff"/>
+        </g>
+        <path d="M4 24 Q8 28 13 26 C27 13 42 8 58 9 C81 10 99 24 112 39
+          C94 26 76 16 57 15 C39 14 23 20 11 33 Q6 30 4 24Z" fill="#090d15"/>
+        <path d="M17 17 C29 5 47 2 62 5 Q38 5 17 17Z" fill="#090d15"/>
+        <path d="m19 41 9 6-5-1Zm10 7 10 5-6-1Z" fill="#090d15"/>
+      </symbol>
+
+      <linearGradient id="kb-burst-fade">
+        <stop stop-color="#fff"/>
+        <stop offset=".35" stop-color="#fff" stop-opacity=".9"/>
+        <stop offset=".49" stop-color="#fff" stop-opacity="0"/>
+        <stop offset=".51" stop-color="#fff" stop-opacity="0"/>
+        <stop offset=".65" stop-color="#fff" stop-opacity=".9"/>
+        <stop offset="1" stop-color="#fff"/>
+      </linearGradient>
+      <mask id="kb-burst-mask" maskUnits="userSpaceOnUse" x="0" y="0" width="480" height="74">
+        <rect width="480" height="74" fill="url(#kb-burst-fade)"/>
+      </mask>
+      <symbol id="kb-speed-lines" viewBox="0 0 480 74" preserveAspectRatio="none">
+        <g mask="url(#kb-burst-mask)">
+          <path class="ink-rays" opacity=".72" d="
+            M0 0H22L205 31Z M45 0H52L168 24Z M78 0H98L223 33Z
+            M123 0H132L190 22Z M156 0H174L218 28Z M195 0H200L227 29Z
+            M0 13V18L193 33Z M0 24V27L120 31Z M0 34V37L177 36Z
+            M0 43V49L211 39Z M0 58V62L159 45Z
+            M0 74H22L219 41Z M43 74H52L166 51Z M76 74H98L218 42Z
+            M123 74H128L196 48Z M159 74H171L222 45Z
+            M281 0H287L255 27Z M310 0H323L262 28Z M346 0H355L289 23Z
+            M382 0H405L261 34Z M424 0H433L306 23Z M463 0H480L273 32Z
+            M480 10V15L296 32Z M480 21V27L265 36Z M480 34V37L321 37Z
+            M480 42V46L271 39Z M480 55V59L304 44Z M480 68V73L290 45Z
+            M444 74H426L263 41Z M399 74H392L306 52Z M360 74H342L267 43Z
+            M322 74H318L274 52Z M297 74H287L259 46Z"/>
+          <path class="light-rays" opacity=".9" d="
+            M26 0H31L181 26Z M105 0H112L222 34Z M141 0H145L195 24Z
+            M0 6V9L226 36Z M0 29V31L171 35Z M0 50V54L193 41Z
+            M0 65V68L153 47Z M27 74H32L200 44Z M63 74H70L215 42Z
+            M105 74H112L186 51Z M139 74H146L206 47Z
+            M336 0H342L282 25Z M408 0H415L277 32Z M447 0H452L300 27Z
+            M480 4V7L326 25Z M480 28V31L269 37Z M480 48V51L273 40Z
+            M480 61V64L339 48Z M468 74H462L295 46Z M414 74H405L267 41Z
+            M378 74H374L289 49Z M334 74H328L275 47Z"/>
+        </g>
+      </symbol>
+    </defs>
+  </svg>
+  <div class="open-row" id="openRow"><button id="btnOpen" type="button" aria-label="ひらく（Space キー）" title="Space キーでも開け閉めできます"><svg class="burst" aria-hidden="true" focusable="false"><use href="#kb-speed-lines"/></svg><svg class="eye" aria-hidden="true" focusable="false"><use href="#kb-eye"/></svg><span class="kanji" id="openLabel" aria-hidden="true">開</span><svg class="eye eye-right" aria-hidden="true" focusable="false"><use href="#kb-eye"/></svg></button></div>
 
   <div class="bar">
     <div class="group">
@@ -485,7 +559,7 @@ function layout() {
   const ar = src.width / src.height;
   dispW = Math.floor(Math.min(wrapW, maxH * ar)); dispH = Math.floor(dispW / ar);
   sc = dispW / src.width;
-  stage.style.width = dispW + 'px'; stage.style.height = dispH + 'px'; $('#btnOpen').style.width = Math.max(220, dispW - 8) + 'px';
+  stage.style.width = dispW + 'px'; stage.style.height = dispH + 'px'; $('#btnOpen').style.width = Math.max(260, dispW) + 'px';
   fx.width = dispW * dpr; fx.height = dispH * dpr;
   renderer.setPixelRatio(dpr); renderer.setSize(dispW, dispH, false); U.uDpr.value = dpr;
   camera.aspect = dispW / dispH;
@@ -1422,15 +1496,16 @@ function openAll() {
   { const t = now(); books.forEach(b => { b.t0 = t; }); particles.forEach(p => { p.life = 0; }); }
   fxState = { t0: now(), kind: 'open' };
   sfx('バラララッ', books[0], 'open'); sndOpen();
-  $('#openLabel').textContent = 'とじる';
+  setOpenLabel(true);
   msg('ページの左右を外側へドラッグすると、さらにひらきます。');
 }
+function setOpenLabel(open) { $('#openLabel').textContent = open ? '閉' : '開'; $('#btnOpen').setAttribute('aria-label', open ? 'とじる（Space キー）' : 'ひらく（Space キー）'); }
 function closeAll() {
   const t = now();
   for (const b of books) { if (b.state === 'closed') continue; b.state = 'closing'; b.t0 = t; }
   fxState = { t0: t, kind: 'close' }; sndClose();
   if (books[0]) sfx('パタン', books[0], 'close');
-  $('#openLabel').textContent = 'ひらく';
+  setOpenLabel(false);
 }
 function toggle() { isOpen() ? closeAll() : openAll(); }
 $('#btnOpen').addEventListener('click', toggle);
@@ -1458,7 +1533,7 @@ $('#ink').addEventListener('focus', () => { inkFocus = true; });
 $('#ink').addEventListener('blur', () => { inkFocus = false; });
 $('#btnSound').addEventListener('click', e => { soundOn = !soundOn; e.currentTarget.setAttribute('aria-pressed', soundOn); e.currentTarget.textContent = soundOn ? '音 オン' : '音 オフ'; });
 
-function resetSource() { books.forEach(disposeBook); books = []; srcGen++; frozen = false; grade = 0; fxState = null; sfxState = null; particles = []; $('#openLabel').textContent = 'ひらく'; }
+function resetSource() { books.forEach(disposeBook); books = []; srcGen++; frozen = false; grade = 0; fxState = null; sfxState = null; particles = []; setOpenLabel(false); }
 function stopVideo() { if (video && video.srcObject) video.srcObject.getTracks().forEach(t => t.stop()); video = null; }
 
 function useDemo() { stopVideo(); resetSource(); mode = 'demo'; faces = drawDemo(); layout(); msg(''); pill('見本の顔', 'ok'); }
