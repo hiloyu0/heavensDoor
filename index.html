@@ -65,6 +65,7 @@ button:focus-visible, .btn:focus-within, input:focus-visible { outline: 2px soli
 .open-row { display: flex; justify-content: center; margin-top: -2px; }
 .cam-err { align-self: center; max-width: 640px; width: 100%; font-size: 13px; line-height: 1.6; color: #ffd9cf; background: rgba(210,69,47,.14); border: 1px solid rgba(210,69,47,.55); border-radius: 6px; padding: 8px 12px; }
 .cam-err .en { display: block; color: #d9b8b0; font-size: 12px; margin-top: 2px; }
+.cam-err .cam-act { margin-top: 8px; font-size: 14px; color: #1a1020; background: #ffe2d8; border-color: #ffe2d8; font-weight: 700; }
 #btnOpen { --glow: #fff; --inner-glow: #dbfdff; --cyan: #20c5df; --edge: #09708e; --ray: #07516c; --light-ray: #d1fbff; --letter: #fff; --outline: #090d15;
   position: relative; isolation: isolate; display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; justify-items: center; gap: 0;
   width: 100%; max-width: 700px; height: 82px; padding: 0 4%; overflow: hidden; border: 2px solid #090d15; border-radius: 6px;
@@ -1604,7 +1605,27 @@ window.addEventListener('dragover', e => { if (!hasFiles(e)) return; e.preventDe
 window.addEventListener('dragleave', e => { if (!hasFiles(e)) return; dragDepth = Math.max(0, dragDepth - 1); if (!dragDepth) $('#drop').hidden = true; });
 window.addEventListener('drop', e => { if (!hasFiles(e)) return; e.preventDefault(); dragDepth = 0; $('#drop').hidden = true; const fl = [...e.dataTransfer.files].find(f => f.type.startsWith('image/')); if (fl) useImage(fl); else msg('画像ファイルをドロップしてください。'); });
 
-function camError(ja, en) { const e = $('#camErr'); if (!ja) { e.hidden = true; e.textContent = ''; return; } e.textContent = ja; const s = document.createElement('span'); s.className = 'en'; s.lang = 'en'; s.textContent = en; e.append(s); e.hidden = false; }
+function camError(ja, en, action) {
+  const e = $('#camErr'); if (!ja) { e.hidden = true; e.textContent = ''; return; }
+  e.textContent = ja; const s = document.createElement('span'); s.className = 'en'; s.lang = 'en'; s.textContent = en; e.append(s);
+  if (action) { const b = document.createElement('button'); b.type = 'button'; b.className = 'cam-act'; b.textContent = action.label; b.addEventListener('click', action.run); e.append(b); }
+  e.hidden = false;
+}
+// leave an in-app browser (X, LINE, Instagram…) or an embedding page for the real browser, where the live camera works
+const PUBLIC_URL = 'https://hiloyu0.github.io/kaohon/';
+function openInBrowser() {
+  let framed = false; try { framed = window.self !== window.top; } catch (_) { framed = true; }
+  const url = framed || !/^https?:/.test(location.href) ? PUBLIC_URL : location.href.split('#')[0];
+  const ua = navigator.userAgent;
+  if (/Line\//.test(ua)) { location.href = url + (url.includes('?') ? '&' : '?') + 'openExternalBrowser=1'; return; }
+  if (/Android/.test(ua) && !framed) {
+    const u = new URL(url);
+    location.href = `intent://${u.host}${u.pathname}${u.search}#Intent;scheme=https;package=com.android.chrome;S.browser_fallback_url=${encodeURIComponent(url)};end`;
+    return;
+  }
+  if (/iPhone|iPad|iPod/.test(ua) && !framed) { location.href = 'x-safari-' + url; return; }
+  window.open(url, '_blank', 'noopener');
+}
 $('#btnCam').addEventListener('click', async () => {
   // never fall back to the photo picker: if live video fails, say why (and how to get it) under the open button
   let framed = false; try { framed = window.self !== window.top; } catch (_) { framed = true; }
@@ -1617,8 +1638,13 @@ $('#btnCam').addEventListener('click', async () => {
     msg(modelsReady ? '' : '顔認識モデルを読み込み中です…');
   } catch (err) {
     const n = err && err.name;
-    const [ja, en] = inApp ? ['アプリの中のブラウザではカメラが使えないことがあります。右上のメニューから「ブラウザで開く」を選んでください。', 'The camera may not work in in-app browsers. Choose "Open in browser" from the menu at the top right.']
-      : framed ? ['このページの中ではカメラが使えません。かおほんのページを直接開いてください。', 'The camera cannot be used inside this embedded page. Please open the kaohon page directly.']
+    if (inApp || framed) {
+      camError(inApp ? 'アプリの中のブラウザではカメラが使えないことがあります。下のボタンで Chrome や Safari で開き直してください。' : 'このページの中ではカメラが使えません。下のボタンでかおほんのページを開いてください。',
+        inApp ? 'The camera may not work in in-app browsers. Use the button below to reopen this page in Chrome or Safari.' : 'The camera cannot be used inside this embedded page. Use the button below to open kaohon directly.',
+        { label: 'ブラウザで開く / Open in browser', run: openInBrowser });
+      msg(''); return;
+    }
+    const [ja, en] = false ? ['', '']
       : !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia
       ? ['このページの開き方ではカメラを使えません。Chrome か Safari で開き直してください。', 'The camera is not available here. Please open this page in Chrome or Safari.']
       : n === 'NotAllowedError' || n === 'SecurityError' ? ['カメラが許可されていません。アドレスバーのアイコンからカメラを「許可」にして、もう一度押してください。', 'Camera access is blocked. Allow the camera from the icon in the address bar, then press the button again.']
