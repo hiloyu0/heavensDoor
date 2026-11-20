@@ -61,8 +61,21 @@ h1 small { font-family: var(--f-body); font-size: 13px; letter-spacing: .08em; c
 button, .btn { font: inherit; font-size: 14px; color: var(--paper); background: var(--ink-2); border: 1px solid var(--line); padding: 9px 14px; border-radius: 6px; cursor: pointer; display: inline-flex; align-items: center; gap: 7px; letter-spacing: .04em; position: relative; }
 button:hover, .btn:hover { border-color: var(--paper-dim); }
 button:focus-visible, .btn:focus-within, input:focus-visible { outline: 2px solid var(--ochre); outline-offset: 2px; }
-#btnOpen { font-family: var(--f-display); font-size: 17px; padding: 10px 22px; background: var(--ochre); color: #1a1020; border-color: var(--ochre); letter-spacing: .12em; }
-#btnOpen:hover { filter: brightness(1.08); }
+/* the big open button: bold manga-cover feel (thick ink outline, hard offset shadow, halftone, gold on violet) */
+.open-row { display: flex; justify-content: center; margin-top: -2px; }
+#btnOpen { width: 100%; justify-content: center; font-family: var(--f-display); font-size: clamp(22px, 5.4vw, 34px); letter-spacing: .5em; text-indent: .5em;
+  padding: 12px 18px 13px; color: #ffe27a; border: 3px solid #0d0812; border-radius: 4px; transform: skewX(-8deg);
+  background:
+    radial-gradient(circle at 1px 1px, rgba(255,255,255,.16) 1.1px, transparent 1.6px) 0 0 / 7px 7px,
+    linear-gradient(100deg, #2a0f4a 0%, #5b1b78 45%, #8a1f6a 75%, #3a0f3c 100%);
+  box-shadow: 6px 6px 0 #0d0812, 6px 6px 0 2px #c99a2e;
+  text-shadow: 2px 2px 0 #0d0812, -1px -1px 0 #0d0812, 1px -1px 0 #0d0812, -1px 1px 0 #0d0812, 4px 4px 0 rgba(210,69,47,.85);
+  transition: transform .08s, box-shadow .08s, filter .15s; }
+#btnOpen > * { display: inline-block; transform: skewX(8deg); }
+#btnOpen kbd { letter-spacing: 0; text-indent: 0; color: #ffe27a; text-shadow: none; position: absolute; right: 14px; top: 50%; transform: translateY(-50%) skewX(8deg); }
+#btnOpen:hover { filter: brightness(1.12) saturate(1.1); }
+#btnOpen:active { transform: skewX(-8deg) translate(4px, 4px); box-shadow: 2px 2px 0 #0d0812, 2px 2px 0 2px #c99a2e; }
+#btnOpen:focus-visible { outline: 3px solid #ffe27a; outline-offset: 4px; }
 kbd { font-family: var(--f-body); font-size: 11px; border: 1px solid currentColor; border-radius: 3px; padding: 0 4px; opacity: .7; }
 @media (hover: none) { kbd { display: none; } }
 .btn input { position: absolute; width: 1px; height: 1px; opacity: 0; }
@@ -100,9 +113,10 @@ kbd { font-family: var(--f-body); font-size: 11px; border: 1px solid currentColo
     </div>
   </div>
 
+  <div class="open-row" id="openRow"><button id="btnOpen" type="button"><span id="openLabel">ひらく</span><kbd>Space</kbd></button></div>
+
   <div class="bar">
     <div class="group">
-      <button id="btnOpen" type="button"><span id="openLabel">ひらく</span> <kbd>Space</kbd></button>
       <button id="btnCam" type="button">カメラ</button>
       <input id="snap" type="file" accept="image/*" capture="user" hidden>
       <label class="btn" for="file" title="ページのどこにでもドロップできます">写真を選ぶ／ドロップ<input id="file" type="file" accept="image/*"></label>
@@ -469,7 +483,7 @@ function layout() {
   const ar = src.width / src.height;
   dispW = Math.floor(Math.min(wrapW, maxH * ar)); dispH = Math.floor(dispW / ar);
   sc = dispW / src.width;
-  stage.style.width = dispW + 'px'; stage.style.height = dispH + 'px';
+  stage.style.width = dispW + 'px'; stage.style.height = dispH + 'px'; $('#btnOpen').style.width = Math.max(220, dispW - 8) + 'px';
   fx.width = dispW * dpr; fx.height = dispH * dpr;
   renderer.setPixelRatio(dpr); renderer.setSize(dispW, dispH, false); U.uDpr.value = dpr;
   camera.aspect = dispW / dispH;
