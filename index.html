@@ -1313,6 +1313,9 @@ $('#writeForm').addEventListener('submit', e => {
 });
 
 let showOutline = false;
+// the outline check button is a tool for tuning: shown in the claude.ai preview, hidden on the public page unless ?outline is in the address
+{ let framed = false; try { framed = window.self !== window.top; } catch (_) { framed = true; }
+  if (!framed && !/[?&#]outline\b/.test(location.search + location.hash)) $('#btnOutline').hidden = true; }
 $('#btnOutline').addEventListener('click', e => { showOutline = !showOutline; e.currentTarget.setAttribute('aria-pressed', showOutline); e.currentTarget.textContent = showOutline ? '輪郭線 オン' : '輪郭線 オフ'; });
 $('#btnMode').addEventListener('click', e => { openMode = openMode === 'single' ? 'double' : 'single'; e.currentTarget.textContent = openMode === 'single' ? '開き方：片開き' : '開き方：両開き'; if (isOpen()) { closeAll(); setTimeout(() => { if (!isOpen()) openAll(); }, 900); } });
 $('#btnHair').addEventListener('click', e => { hairOn = !hairOn; e.currentTarget.setAttribute('aria-pressed', hairOn); e.currentTarget.textContent = hairOn ? '髪をなびかせる オン' : '髪をなびかせる オフ'; if (isOpen()) { closeAll(); setTimeout(() => { if (!isOpen()) openAll(); }, 900); } });
