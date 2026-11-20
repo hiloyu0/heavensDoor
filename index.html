@@ -1035,7 +1035,7 @@ function emitFromTip(b, p) {
   for (let i = 0; i < 3; i++) { const a = (p.side > 0 ? 0 : Math.PI) + (r() - .5) * 1.4 + b.f.ang, sp = 120 + r() * 300; scrap(x, y + (r() - .5) * 60, Math.cos(a) * sp, Math.sin(a) * sp - 100, 0.05, false); }
 }
 // HOLD: optional still beat inside the effect clock (0; the video gets its lead-in from REC_LEAD instead)
-const BUILD = 0.35, IMPACT_LEN = 0.2, REC_LEAD = 2, REC_TAIL = 2.6;
+const BUILD = 0.35, IMPACT_LEN = 0.2, REC_LEAD = 1.5, REC_TAIL = 3.6;
 let HOLD = 0, IMPACT_AT = BUILD;
 function setHold(h) { HOLD = h; IMPACT_AT = h + BUILD; }
 // check view: the outline the face sheet is cut to (yellow) and the detected landmarks (cyan)
@@ -1342,7 +1342,7 @@ async function recordEffect() {
   audio(); if (recDest && soundOn) tracks.push(...recDest.stream.getAudioTracks());
   const mime = pickMime(), mr = new MediaRecorder(new MediaStream(tracks), mime ? { mimeType: mime, videoBitsPerSecond: 6e6 } : undefined);
   const chunks = []; mr.ondataavailable = e => { if (e.data && e.data.size) chunks.push(e.data); };
-  rec = mr; btn.disabled = true; btn.textContent = '録画中…'; msg('めくれるところを録画しています（約5秒）。');
+  rec = mr; btn.disabled = true; btn.textContent = '録画中…'; msg('めくれるところを録画しています（約6秒）。');
   const done = new Promise(r => { mr.onstop = r; });
   // record the still face for a moment first (real frames, so phones keep it), then open, and stop soon after the pages settle
   mr.start(250);
