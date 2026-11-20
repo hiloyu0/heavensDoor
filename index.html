@@ -101,6 +101,7 @@ kbd { font-family: var(--f-body); font-size: 11px; border: 1px solid currentColo
       <button id="btnCam" type="button">カメラ</button>
       <input id="snap" type="file" accept="image/*" capture="user" hidden>
       <label class="btn" for="file" title="ページのどこにでもドロップできます">写真を選ぶ／ドロップ<input id="file" type="file" accept="image/*"></label>
+      <button id="btnRec" type="button">動画で保存</button>
       <button id="btnSound" type="button" aria-pressed="true">音 オン</button>
       <button id="btnHair" type="button" aria-pressed="true">髪をなびかせる オン</button>
       <button id="btnMode" type="button">開き方：片開き</button>
@@ -1123,11 +1124,12 @@ function drawFx(t, dt) {
 }
 
 /* ---------- sound ---------- */
-let actx = null, soundOn = true, noiseBuf = null;
+let actx = null, soundOn = true, noiseBuf = null, master = null, recDest = null;
 function audio() {
   if (!soundOn) return null;
   try {
-    if (!actx) { actx = new (window.AudioContext || window.webkitAudioContext)(); noiseBuf = actx.createBuffer(1, actx.sampleRate * 0.6, actx.sampleRate); const d = noiseBuf.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1; }
+    if (!actx) { actx = new (window.AudioContext || window.webkitAudioContext)(); noiseBuf = actx.createBuffer(1, actx.sampleRate * 0.6, actx.sampleRate); const d = noiseBuf.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+      master = actx.createGain(); master.connect(actx.destination); if (actx.createMediaStreamDestination) { recDest = actx.createMediaStreamDestination(); master.connect(recDest); } }
     if (actx.state === 'suspended') actx.resume();
     return actx;
   } catch (e) { return null; }
@@ -1137,14 +1139,14 @@ function noise(at, dur, f0, f1, vol, type = 'bandpass', q = 0.9) {
   const s = a.createBufferSource(); s.buffer = noiseBuf;
   const fl = a.createBiquadFilter(); fl.type = type; fl.Q.value = q; fl.frequency.setValueAtTime(f0, a.currentTime + at); fl.frequency.exponentialRampToValueAtTime(f1, a.currentTime + at + dur);
   const g = a.createGain(); g.gain.setValueAtTime(0.0001, a.currentTime + at); g.gain.exponentialRampToValueAtTime(vol, a.currentTime + at + 0.006); g.gain.exponentialRampToValueAtTime(0.0001, a.currentTime + at + dur);
-  s.connect(fl).connect(g).connect(a.destination); s.start(a.currentTime + at, Math.random() * 0.3); s.stop(a.currentTime + at + dur + 0.05);
+  s.connect(fl).connect(g).connect(master); s.start(a.currentTime + at, Math.random() * 0.3); s.stop(a.currentTime + at + dur + 0.05);
 }
 function thump(at, vol) {
   const a = audio(); if (!a) return;
   const o = a.createOscillator(), g = a.createGain(); o.type = 'sine';
   o.frequency.setValueAtTime(150, a.currentTime + at); o.frequency.exponentialRampToValueAtTime(42, a.currentTime + at + 0.25);
   g.gain.setValueAtTime(0.0001, a.currentTime + at); g.gain.exponentialRampToValueAtTime(vol, a.currentTime + at + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, a.currentTime + at + 0.35);
-  o.connect(g).connect(a.destination); o.start(a.currentTime + at); o.stop(a.currentTime + at + 0.4);
+  o.connect(g).connect(master); o.start(a.currentTime + at); o.stop(a.currentTime + at + 0.4);
 }
 // a page turning: fibre crackle riding on an airy swell, ending in a soft flap; every one slightly different
 function flipBuffer(a, dur) {
@@ -1174,7 +1176,7 @@ function paperFlip(at, vol = 0.22) {
   const g = a.createGain(); g.gain.value = vol;
   let node = s.connect(hp).connect(bp).connect(lp).connect(g);
   if (a.createStereoPanner) { const pn = a.createStereoPanner(); pn.pan.value = (Math.random() - 0.5) * 0.8; node = node.connect(pn); }
-  node.connect(a.destination); s.start(a.currentTime + at);
+  node.connect(master); s.start(a.currentTime + at);
 }
 function sndOpen() {
   noise(0, IMPACT_AT, 400, 4200, 0.18, 'bandpass', 2.5);          // rising tear
@@ -1219,7 +1221,7 @@ function drawSfx(t) {
     if (out > 0) { op = clamp(1 - out / 0.35, 0, 1); sc2 *= 1 + out * 0.4; }
     if (op > 0) alive = true;
     const jx = (r() - .5) * 3, jy = (r() - .5) * 3 + (i % 2 ? 1 : -1) * 4;
-    spans[i].style.opacity = op;
+    spans[i].style.opacity = op; spans[i].dataset.sc = sc2; spans[i].dataset.op = op;
     spans[i].style.transform = `translate(${jx.toFixed(1)}px,${jy.toFixed(1)}px) scale(${sc2.toFixed(3)}) skewX(-8deg)`;
   }
   if (!alive && e > s.start + 0.5) { sfxState = null; hudHold = t; }
@@ -1249,6 +1251,76 @@ const endDrag = e => { if (drag && (!e || e.pointerId === drag.id)) { lastDragMo
 stage.addEventListener('pointerup', endDrag); stage.addEventListener('pointercancel', endDrag);
 
 /* ---------- writing UI: prompt chip and glowing pen tip ---------- */
+/* ---------- save the effect as a video ---------- */
+let rec = null, recTrack = null;
+const recCanvas = document.createElement('canvas'), recCtx = recCanvas.getContext('2d');
+function composeRecFrame() {
+  const w = recCanvas.width, h = recCanvas.height, k = w / dispW;
+  recCtx.drawImage(glc, 0, 0, w, h);
+  if (grade > 0.01) { const g = recCtx.createRadialGradient(w / 2, h / 2, Math.min(w, h) * 0.3, w / 2, h / 2, Math.hypot(w, h) * 0.55); g.addColorStop(0, 'rgba(10,6,16,0)'); g.addColorStop(1, `rgba(10,6,16,${(0.8 * grade).toFixed(3)})`); recCtx.fillStyle = g; recCtx.fillRect(0, 0, w, h); }
+  recCtx.drawImage(fx, 0, 0, w, h);
+  if (sfxState) {
+    const sr = stage.getBoundingClientRect();
+    for (const sp of $('#sfx').children) {
+      const op = +sp.dataset.op || 0; if (op <= 0) continue;
+      const r = sp.getBoundingClientRect(), fs = parseFloat(getComputedStyle(sp).fontSize) * k, sc2 = +sp.dataset.sc || 1;
+      recCtx.save(); recCtx.globalAlpha = op; recCtx.translate((r.left + r.width / 2 - sr.left) * k, (r.top + r.height / 2 - sr.top) * k);
+      recCtx.rotate(sfxState.ang * Math.PI / 180); recCtx.transform(1, 0, -0.14, 1, 0, 0); recCtx.scale(sc2, sc2);
+      recCtx.font = `${fs}px "Dela Gothic One", sans-serif`; recCtx.textAlign = 'center'; recCtx.textBaseline = 'middle';
+      recCtx.lineJoin = 'round'; recCtx.lineWidth = fs * 0.18; recCtx.strokeStyle = '#1a1020';
+      recCtx.fillStyle = '#d2452f'; recCtx.fillText(sp.textContent, fs * 0.06, fs * 0.06);
+      recCtx.strokeText(sp.textContent, 0, 0); recCtx.fillStyle = '#fff8ea'; recCtx.fillText(sp.textContent, 0, 0);
+      recCtx.restore();
+    }
+  }
+}
+function pickMime() {
+  const c = ['video/mp4;codecs=avc1.42E01E,mp4a.40.2', 'video/mp4', 'video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm'];
+  return c.find(m => window.MediaRecorder && MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(m)) || '';
+}
+async function saveVideo(blob, ext) {
+  const name = `kao-no-sho-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')}.${ext}`;
+  const file = new File([blob], name, { type: blob.type });
+  // phones: hand the clip straight to the share sheet (post to X, save to photos)
+  if (navigator.canShare && navigator.canShare({ files: [file] })) {
+    try { await navigator.share({ files: [file], title: '顔の書' }); msg('動画を共有しました。'); return; } catch (e) { if (e && e.name === 'AbortError') { msg('共有をやめました。もう一度「動画で保存」で撮り直せます。'); return; } }
+  }
+  // inside the claude.ai viewer, page-started downloads go through the downloads capability
+  let framed = false; try { framed = window.self !== window.top; } catch (_) { framed = true; }
+  if (framed && window.claude && window.claude.use) {
+    try { const dl = await window.claude.use('downloads'); if (dl) { await dl.save({ filename: name, data: blob }); msg('動画を保存しました。'); return; } } catch (e) { msg('動画を保存できませんでした。'); return; }
+  }
+  const url = URL.createObjectURL(blob), a = document.createElement('a'); a.href = url; a.download = name; document.body.append(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 10000);
+  msg(`動画を保存しました（${name}）。`);
+}
+async function recordEffect() {
+  if (rec) return;
+  if (!window.MediaRecorder || !recCanvas.captureStream) { msg('このブラウザは動画の書き出しに対応していません。'); return; }
+  if (!faces.length) { msg('顔が見つかってから押してください。'); return; }
+  const btn = $('#btnRec');
+  if (isOpen()) { closeAll(); await new Promise(r => setTimeout(r, 1100)); }
+  recCanvas.width = Math.round(dispW * Math.min(dpr, 2) / 2) * 2; recCanvas.height = Math.round(dispH * Math.min(dpr, 2) / 2) * 2;
+  // frames are pushed explicitly after each composed frame, so every rendered frame lands in the video
+  const vs = recCanvas.captureStream(0), tracks = [...vs.getVideoTracks()]; recTrack = tracks[0];
+  audio(); if (recDest && soundOn) tracks.push(...recDest.stream.getAudioTracks());
+  const mime = pickMime(), mr = new MediaRecorder(new MediaStream(tracks), mime ? { mimeType: mime, videoBitsPerSecond: 6e6 } : undefined);
+  const chunks = []; mr.ondataavailable = e => { if (e.data && e.data.size) chunks.push(e.data); };
+  rec = mr; btn.disabled = true; btn.textContent = '録画中…'; msg('めくれるところを録画しています（約4秒）。');
+  const done = new Promise(r => { mr.onstop = r; });
+  // build the book first, then record from the moment the effect clock starts until it has settled
+  openAll();
+  if (!books.length) { rec = null; btn.disabled = false; btn.textContent = '動画で保存'; return; }
+  mr.start(250);
+  const t0 = fxState ? fxState.t0 : now(), wall = performance.now();
+  await new Promise(r => { const tick = () => (now() - t0 > 3.8 || performance.now() - wall > 20000) ? r() : requestAnimationFrame(tick); tick(); });
+  mr.stop(); await done; rec = null; recTrack = null;
+  btn.disabled = false; btn.textContent = '動画で保存';
+  const type = (mr.mimeType || mime || 'video/webm').split(';')[0], blob = new Blob(chunks, { type });
+  await saveVideo(blob, type.includes('mp4') ? 'mp4' : 'webm');
+}
+$('#btnRec').addEventListener('click', recordEffect);
+
 function drawInkUi(t) {
   for (const bk of books) {
     if (!bk.inkPen || bk.state === 'closing') continue;
@@ -1531,6 +1603,7 @@ function frame() {
   drawSfx(t);
   drawInkUi(t);
   renderer.render(scene, camera);
+  if (rec) { composeRecFrame(); if (recTrack && recTrack.requestFrame) recTrack.requestFrame(); }
   requestAnimationFrame(frame);
 }
 
