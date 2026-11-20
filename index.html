@@ -625,8 +625,8 @@ function createBook(face, idx) {
       sx: isCover ? 1 : 1 - (NPAGES - k) * 0.01 + (r() - .5) * 0.02, sy: isCover ? 1 : 1 - (NPAGES - k) * 0.006 + (r() - .5) * 0.015,
       target: isCover ? (double ? 2.86 : coverT) : (double ? 2.86 - (NPAGES - k) * 0.21 : Math.max(1.75, coverT - (NPAGES - k) * 0.21)) + (r() - .5) * 0.03,
       curl: 0.22 + r() * 0.32,
-      delay: (isCover ? 0.26 : 0.36 + [0, 0.05, 0.09, 0.125, 0.155][NPAGES - 1 - k]) + (hf.side > 0 ? 0.015 : 0),
-      K: isCover ? 120 : 80 + r() * 60, zeta: isCover ? 0.5 : 0.34 + r() * 0.14,
+      delay: (isCover ? IMPACT_AT : IMPACT_AT + 0.14 + [0, 0.08, 0.15, 0.21, 0.26][NPAGES - 1 - k]) + (hf.side > 0 ? 0.02 : 0),
+      K: isCover ? 48 : 34 + r() * 22, zeta: isCover ? 0.55 : 0.4 + r() * 0.12,
       theta: 0, vel: 0, bend: 0, wave: 0, phase: r() * 6.28, launched: false };
     if (frontW) { p.texHoled = [mat.uniforms.front.value, mat.uniforms.back.value]; p.texWhole = [tex(frontW), tex(backW)]; p.whole = false; }
     bendPage(p, f); pages.push(p);
@@ -728,7 +728,7 @@ function updateBook(b, t, dt) {
     let tgt;
     if (opening) {
       if (el < p.delay - 0.14) tgt = 0;
-      else if (el < p.delay) tgt = 0;
+      else if (el < p.delay) tgt = p.isCover ? 0.07 * smooth(p.delay * 0.45, p.delay, el) : 0;
       else {
         let target = p.target;
         if (b.mode !== 'double' && target > Math.PI / 2) target = Math.max(Math.min(target, 2.0), Math.PI / 2 + (target - Math.PI / 2) * b.fit);
@@ -739,7 +739,7 @@ function updateBook(b, t, dt) {
         p.eff = target;
         tgt = target + (el > p.delay + 1.2 ? (p.isCover ? 0.015 : target < 0.2 ? 0.01 : 0.045) * Math.sin(t * 1.7 + p.phase) : 0);
       }
-      if (el >= p.delay && !p.launched) { p.launched = true; p.vel += p.isCover ? 5.5 : 5 + Math.random() * 3; if (!p.isCover) emitFromTip(b, p); }
+      if (el >= p.delay && !p.launched) { p.launched = true; p.vel += p.isCover ? 3.2 : 2.6 + Math.random() * 1.5; if (!p.isCover) emitFromTip(b, p); }
     } else {
       tgt = el < (p.isCover ? 0.16 : 0.02 * (NPAGES - p.k)) ? p.theta : 0;
     }
@@ -782,11 +782,11 @@ function updateBook(b, t, dt) {
       if (sx < mg * 2.5 || sx > dispW - mg * 2.5 || sy < mg * 2.5 || sy > dispH - mg * 2.5) roomy = false; } }
     if (out) b.fit = Math.max(0.25, b.fit - dt * 0.9); else if (roomy) b.fit = Math.min(1, b.fit + dt * 0.2);
   }
-  if (opening && el > 2) b.state = 'open';
+  if (opening && el > 2.4) b.state = 'open';
   if (!opening && el > 0.4 && settled) b.state = 'closed';
   // vermilion handwriting, a dozen characters a second
   const total = inkTotal();
-  if (opening && el > 1.0 && b.inkShown < total) {
+  if (opening && el > 1.4 && b.inkShown < total) {
     b.inkT += dt; const n = Math.min(total, Math.floor(b.inkT * 14));
     if (n !== b.inkShown) { b.inkShown = n; renderBase(b, n); }
   }
@@ -1012,7 +1012,7 @@ function emitFromTip(b, p) {
   const [x, y] = tipScreen(b, p), r = Math.random;
   for (let i = 0; i < 3; i++) { const a = (p.side > 0 ? 0 : Math.PI) + (r() - .5) * 1.4 + b.f.ang, sp = 120 + r() * 300; scrap(x, y + (r() - .5) * 60, Math.cos(a) * sp, Math.sin(a) * sp - 100, 0.05, false); }
 }
-const IMPACT_AT = 0.26, IMPACT_LEN = 0.045;
+const IMPACT_AT = 0.6, IMPACT_LEN = 0.05;
 // check view: the outline the face sheet is cut to (yellow) and the detected landmarks (cyan)
 function drawOutlines() {
   const list = books.length ? books.map(b => b.f) : faces.map(fc => fc.frame);
@@ -1065,7 +1065,7 @@ function drawFx(t, dt) {
           const nUse = Math.max(2, Math.ceil(edge.length * q)), path = edge.slice(0, nUse);
           const [bx2, by2] = path[path.length - 1];
           fxx.save(); fxx.globalAlpha = fade; fxx.lineCap = 'round'; fxx.lineJoin = 'round';
-          fxx.strokeStyle = impact ? '#ffffff' : 'rgba(255,244,220,0.35)'; fxx.shadowColor = impact ? '#ffffff' : '#fff4dc'; fxx.shadowBlur = 14; fxx.lineWidth = 1.5 + 2.5 * smooth(IMPACT_AT - 0.08, IMPACT_AT, e);
+          fxx.strokeStyle = impact ? '#ffffff' : `rgba(255,244,220,${(0.45 + 0.45 * q).toFixed(2)})`; fxx.shadowColor = impact ? '#ffffff' : '#ffe2a8'; fxx.shadowBlur = 12 + 14 * q; fxx.lineWidth = 2 + 4 * smooth(IMPACT_AT * 0.5, IMPACT_AT, e);
           fxx.beginPath(); path.forEach(([x, y], i) => i ? fxx.lineTo(x, y) : fxx.moveTo(x, y)); fxx.stroke();
           fxx.shadowBlur = 0; fxx.strokeStyle = '#fffaf0'; fxx.lineWidth = 1.4; fxx.stroke();
           // spark at the leading point
@@ -1092,6 +1092,7 @@ function drawFx(t, dt) {
       // a small pre-hit pulse
       if (e < 0.1) { fxx.fillStyle = `rgba(255,240,210,${0.25 * (1 - e / 0.1)})`; fxx.fillRect(0, 0, dispW, dispH); }
       // directional shake along the split
+      if (e < IMPACT_AT) { const k = smooth(IMPACT_AT * 0.3, IMPACT_AT, e); shakeX = (Math.random() - 0.5) * 3 * k; shakeY = (Math.random() - 0.5) * 3 * k; }
       if (e > IMPACT_AT) { const d = e - IMPACT_AT; const amp = 11 * Math.exp(-d * 7); shakeX = amp * Math.sin(d * 72); shakeY = amp * 0.25 * Math.sin(d * 51 + 1); }
       if (e > 2.6) fxState = null;
     } else if (fxState.kind === 'close') {
@@ -1180,8 +1181,8 @@ function paperFlip(at, vol = 0.22) {
 function sndOpen() {
   noise(0, IMPACT_AT, 400, 4200, 0.18, 'bandpass', 2.5);          // rising tear
   thump(IMPACT_AT, 0.6); noise(IMPACT_AT, 0.16, 6000, 2500, 0.35, 'highpass', 0.5);
-  [0.27, 0.31, 0.35, 0.385, 0.415, 0.44].forEach((d, i) => paperFlip(d + Math.random() * 0.015, i === 0 ? 0.3 : 0.2 + Math.random() * 0.06));
-  [1.1, 1.16, 1.21].forEach(d => paperFlip(d + Math.random() * 0.03, 0.12));   // the pages settle
+  [0.01, 0.15, 0.23, 0.3, 0.36, 0.41].forEach((d, i) => paperFlip(IMPACT_AT + d + Math.random() * 0.015, i === 0 ? 0.3 : 0.2 + Math.random() * 0.06));
+  [1.6, 1.68, 1.75].forEach(d => paperFlip(d + Math.random() * 0.03, 0.12));   // the pages settle
 }
 function sndClose() { for (let i = 0; i < 5; i++) paperFlip(i * 0.04 + Math.random() * 0.01, 0.16); noise(0.4, 0.16, 1200, 250, 0.45, 'lowpass', 0.7); thump(0.42, 0.35); }
 
@@ -1305,14 +1306,14 @@ async function recordEffect() {
   audio(); if (recDest && soundOn) tracks.push(...recDest.stream.getAudioTracks());
   const mime = pickMime(), mr = new MediaRecorder(new MediaStream(tracks), mime ? { mimeType: mime, videoBitsPerSecond: 6e6 } : undefined);
   const chunks = []; mr.ondataavailable = e => { if (e.data && e.data.size) chunks.push(e.data); };
-  rec = mr; btn.disabled = true; btn.textContent = '録画中…'; msg('めくれるところを録画しています（約4秒）。');
+  rec = mr; btn.disabled = true; btn.textContent = '録画中…'; msg('めくれるところを録画しています（約4.5秒）。');
   const done = new Promise(r => { mr.onstop = r; });
   // build the book first, then record from the moment the effect clock starts until it has settled
   openAll();
   if (!books.length) { rec = null; btn.disabled = false; btn.textContent = '動画で保存'; return; }
   mr.start(250);
   const t0 = fxState ? fxState.t0 : now(), wall = performance.now();
-  await new Promise(r => { const tick = () => (now() - t0 > 3.8 || performance.now() - wall > 20000) ? r() : requestAnimationFrame(tick); tick(); });
+  await new Promise(r => { const tick = () => (now() - t0 > 4.4 || performance.now() - wall > 20000) ? r() : requestAnimationFrame(tick); tick(); });
   mr.stop(); await done; rec = null; recTrack = null;
   btn.disabled = false; btn.textContent = '動画で保存';
   const type = (mr.mimeType || mime || 'video/webm').split(';')[0], blob = new Blob(chunks, { type });
@@ -1356,6 +1357,8 @@ function openAll() {
   if (mode !== 'demo') segmentHair(); else mpHairC = null;
   books = faces.map((fc, i) => createBook(fc, i));
   books.forEach(burst);
+  renderer.render(scene, camera);
+  { const t = now(); books.forEach(b => { b.t0 = t; }); particles.forEach(p => { p.life = 0; }); }
   fxState = { t0: now(), kind: 'open' };
   sfx('バラララッ', books[0], 'open'); sndOpen();
   $('#openLabel').textContent = 'とじる';
