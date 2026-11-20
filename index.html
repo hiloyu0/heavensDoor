@@ -640,8 +640,8 @@ function createBook(face, idx) {
       sx: isCover ? 1 : 1 - (NPAGES - k) * 0.01 + (r() - .5) * 0.02, sy: isCover ? 1 : 1 - (NPAGES - k) * 0.006 + (r() - .5) * 0.015,
       target: isCover ? (double ? 2.86 : coverT) : (double ? 2.86 - (NPAGES - k) * 0.21 : Math.max(1.75, coverT - (NPAGES - k) * 0.21)) + (r() - .5) * 0.03,
       curl: 0.22 + r() * 0.32,
-      delay: (isCover ? IMPACT_AT : IMPACT_AT + 0.14 + [0, 0.08, 0.15, 0.21, 0.26][NPAGES - 1 - k]) + (hf.side > 0 ? 0.02 : 0),
-      K: isCover ? 48 : 34 + r() * 22, zeta: isCover ? 0.55 : 0.4 + r() * 0.12,
+      delay: (isCover ? IMPACT_AT : IMPACT_AT + TEMPO.pageGap + TEMPO.offs[NPAGES - 1 - k]) + (hf.side > 0 ? TEMPO.side : 0),
+      K: isCover ? TEMPO.Kc : TEMPO.Kp + r() * TEMPO.Kpr, zeta: isCover ? TEMPO.zc : TEMPO.zp + r() * TEMPO.zpr, vk: isCover ? TEMPO.vc : TEMPO.vp + Math.random() * TEMPO.vpr, lift: isCover ? TEMPO.lift : 0,
       theta: 0, vel: 0, bend: 0, wave: 0, phase: r() * 6.28, launched: false };
     if (frontW) { p.texHoled = [mat.uniforms.front.value, mat.uniforms.back.value]; p.texWhole = [tex(frontW), tex(backW)]; p.whole = false; }
     bendPage(p, f); pages.push(p);
@@ -743,7 +743,7 @@ function updateBook(b, t, dt) {
     let tgt;
     if (opening) {
       if (el < p.delay - 0.14) tgt = 0;
-      else if (el < p.delay) tgt = p.isCover ? 0.07 * smooth(HOLD + BUILD * 0.45, p.delay, el) : 0;
+      else if (el < p.delay) tgt = p.lift ? p.lift * smooth(HOLD + BUILD * 0.45, p.delay, el) : 0;
       else {
         let target = p.target;
         if (b.mode !== 'double' && target > Math.PI / 2) target = Math.max(Math.min(target, 2.0), Math.PI / 2 + (target - Math.PI / 2) * b.fit);
@@ -754,7 +754,7 @@ function updateBook(b, t, dt) {
         p.eff = target;
         tgt = target + (el > p.delay + 1.2 ? (p.isCover ? 0.015 : target < 0.2 ? 0.01 : 0.045) * Math.sin(t * 1.7 + p.phase) : 0);
       }
-      if (el >= p.delay && !p.launched) { p.launched = true; p.vel += p.isCover ? 3.2 : 2.6 + Math.random() * 1.5; if (!p.isCover) emitFromTip(b, p); }
+      if (el >= p.delay && !p.launched) { p.launched = true; p.vel += p.vk; if (!p.isCover) emitFromTip(b, p); }
     } else {
       tgt = el < (p.isCover ? 0.16 : 0.02 * (NPAGES - p.k)) ? p.theta : 0;
     }
@@ -797,11 +797,11 @@ function updateBook(b, t, dt) {
       if (sx < mg * 2.5 || sx > dispW - mg * 2.5 || sy < mg * 2.5 || sy > dispH - mg * 2.5) roomy = false; } }
     if (out) b.fit = Math.max(0.25, b.fit - dt * 0.9); else if (roomy) b.fit = Math.min(1, b.fit + dt * 0.2);
   }
-  if (opening && el > HOLD + 2.2) b.state = 'open';
+  if (opening && el > IMPACT_AT + TEMPO.open) b.state = 'open';
   if (!opening && el > 0.4 && settled) b.state = 'closed';
   // vermilion handwriting, a dozen characters a second
   const total = inkTotal();
-  if (opening && el > HOLD + 1.2 && b.inkShown < total) {
+  if (opening && el > IMPACT_AT + TEMPO.ink && b.inkShown < total) {
     b.inkT += dt; const n = Math.min(total, Math.floor(b.inkT * 14));
     if (n !== b.inkShown) { b.inkShown = n; renderBase(b, n); }
   }
@@ -1035,9 +1035,18 @@ function emitFromTip(b, p) {
   for (let i = 0; i < 3; i++) { const a = (p.side > 0 ? 0 : Math.PI) + (r() - .5) * 1.4 + b.f.ang, sp = 120 + r() * 300; scrap(x, y + (r() - .5) * 60, Math.cos(a) * sp, Math.sin(a) * sp - 100, 0.05, false); }
 }
 // HOLD: optional still beat inside the effect clock (0; the video gets its lead-in from REC_LEAD instead)
-const BUILD = 0.35, IMPACT_LEN = 0.2, REC_LEAD = 1.5, REC_TAIL = 3.6;
+// two tempos: snappy for live use, slower and more dramatic for the saved video
+const TEMPOS = {
+  live:  { build: 0.26, len: 0.05, pageGap: 0.1,  offs: [0, 0.05, 0.09, 0.125, 0.155], side: 0.015, Kc: 120, zc: 0.5,  Kp: 80, Kpr: 60, zp: 0.34, zpr: 0.14, vc: 5.5, vp: 5,   vpr: 3,   lift: 0,
+           flips: [0.01, 0.05, 0.09, 0.125, 0.155, 0.18], settle: [0.84, 0.9, 0.95], ink: 0.74, open: 1.74 },
+  video: { build: 0.35, len: 0.2,  pageGap: 0.14, offs: [0, 0.08, 0.15, 0.21, 0.26],    side: 0.02,  Kc: 48,  zc: 0.55, Kp: 34, Kpr: 22, zp: 0.4,  zpr: 0.12, vc: 3.2, vp: 2.6, vpr: 1.5, lift: 0.07,
+           flips: [0.01, 0.15, 0.23, 0.3, 0.36, 0.41],     settle: [1.05, 1.13, 1.2],  ink: 0.85, open: 1.85 }
+};
+let TEMPO = TEMPOS.live, BUILD = TEMPO.build, IMPACT_LEN = TEMPO.len;
+const REC_LEAD = 1.5, REC_TAIL = 3.6;
 let HOLD = 0, IMPACT_AT = BUILD;
 function setHold(h) { HOLD = h; IMPACT_AT = h + BUILD; }
+function setTempo(name) { TEMPO = TEMPOS[name]; BUILD = TEMPO.build; IMPACT_LEN = TEMPO.len; setHold(HOLD); }
 // check view: the outline the face sheet is cut to (yellow) and the detected landmarks (cyan)
 function drawOutlines() {
   const list = books.length ? books.map(b => b.f) : faces.map(fc => fc.frame);
@@ -1206,8 +1215,8 @@ function paperFlip(at, vol = 0.22) {
 function sndOpen() {
   noise(HOLD, IMPACT_AT - HOLD, 400, 4200, 0.18, 'bandpass', 2.5);          // rising tear
   thump(IMPACT_AT, 0.6); noise(IMPACT_AT, 0.16, 6000, 2500, 0.35, 'highpass', 0.5);
-  [0.01, 0.15, 0.23, 0.3, 0.36, 0.41].forEach((d, i) => paperFlip(IMPACT_AT + d + Math.random() * 0.015, i === 0 ? 0.3 : 0.2 + Math.random() * 0.06));
-  [1.4, 1.48, 1.55].forEach(d => paperFlip(HOLD + d + Math.random() * 0.03, 0.12));   // the pages settle
+  TEMPO.flips.forEach((d, i) => paperFlip(IMPACT_AT + d + Math.random() * 0.015, i === 0 ? 0.3 : 0.2 + Math.random() * 0.06));
+  TEMPO.settle.forEach(d => paperFlip(IMPACT_AT + d + Math.random() * 0.03, 0.12));   // the pages settle
 }
 function sndClose() { for (let i = 0; i < 5; i++) paperFlip(i * 0.04 + Math.random() * 0.01, 0.16); noise(0.4, 0.16, 1200, 250, 0.45, 'lowpass', 0.7); thump(0.42, 0.35); }
 
@@ -1348,9 +1357,9 @@ async function recordEffect() {
   mr.start(250);
   const waitUntil = cond => new Promise(r => { const w0 = performance.now(); const tick = () => (cond() || performance.now() - w0 > 20000) ? r() : requestAnimationFrame(tick); tick(); });
   const w1 = performance.now(); await waitUntil(() => performance.now() - w1 > REC_LEAD * 1000);
-  openAll();
+  setTempo('video'); openAll();
   if (books.length) { const t0 = fxState ? fxState.t0 : now(); await waitUntil(() => now() - t0 > REC_TAIL); }
-  mr.stop(); await done; rec = null; recTrack = null;
+  mr.stop(); await done; rec = null; recTrack = null; setTempo('live');
   btn.disabled = false; btn.textContent = '動画で保存';
   const type = (mr.mimeType || mime || 'video/webm').split(';')[0], blob = new Blob(chunks, { type });
   await saveVideo(blob, type.includes('mp4') ? 'mp4' : 'webm');
