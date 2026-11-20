@@ -196,8 +196,7 @@ kbd { font-family: var(--f-body); font-size: 11px; border: 1px solid currentColo
   <div class="bar">
     <div class="group">
       <button id="btnCam" type="button"><svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M4 7.5h3.2L9 5h6l1.8 2.5H20a1 1 0 0 1 1 1V18a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V8.5a1 1 0 0 1 1-1Z"/><circle cx="12" cy="13" r="3.6"/></svg>カメラ</button>
-      <input id="snap" type="file" accept="image/*" capture="user" hidden>
-      <label class="btn" for="file" title="ページのどこにでもドロップできます">写真を選ぶ／ドロップ<input id="file" type="file" accept="image/*"></label>
+      <label class="btn" for="file" title="ページのどこにでもドロップできます">写真を選ぶ<input id="file" type="file" accept="image/*"></label>
       <button id="btnRec" type="button">動画で保存</button>
       <button id="btnSound" type="button" aria-pressed="true">音 オン</button>
       <button id="btnHair" type="button" aria-pressed="true">髪をなびかせる オン</button>
@@ -1605,18 +1604,11 @@ window.addEventListener('dragover', e => { if (!hasFiles(e)) return; e.preventDe
 window.addEventListener('dragleave', e => { if (!hasFiles(e)) return; dragDepth = Math.max(0, dragDepth - 1); if (!dragDepth) $('#drop').hidden = true; });
 window.addEventListener('drop', e => { if (!hasFiles(e)) return; e.preventDefault(); dragDepth = 0; $('#drop').hidden = true; const fl = [...e.dataTransfer.files].find(f => f.type.startsWith('image/')); if (fl) useImage(fl); else msg('画像ファイルをドロップしてください。'); });
 
-$('#snap').addEventListener('change', e => useImage(e.target.files[0]));
 function camError(ja, en) { const e = $('#camErr'); if (!ja) { e.hidden = true; e.textContent = ''; return; } e.textContent = ja; const s = document.createElement('span'); s.className = 'en'; s.lang = 'en'; s.textContent = en; e.append(s); e.hidden = false; }
 $('#btnCam').addEventListener('click', async () => {
-  // inside the claude.ai viewer live video is blocked, so take a selfie with the device camera instead
+  // never fall back to the photo picker: if live video fails, say why (and how to get it) under the open button
   let framed = false; try { framed = window.self !== window.top; } catch (_) { framed = true; }
-  if (framed) { $('#snap').value = ''; $('#snap').click(); msg('カメラで顔を撮ると、その写真で本がひらけます。'); return; }
-  // in-app browsers (X, Instagram, LINE, Facebook, other Android WebViews) block live video: take a selfie instead
-  if (/TwitterAndroid|Twitter for|Instagram|FBAN|FBAV|Line\/|; wv\)/.test(navigator.userAgent)) {
-    $('#snap').value = ''; $('#snap').click();
-    camError('アプリの中のブラウザでは動画のカメラが使えないので、写真を撮って試せます。動くカメラで遊ぶには、右上のメニューから「ブラウザで開く」を選んでください。', 'Live camera does not work in in-app browsers, so you can take a photo instead. For the live camera, choose "Open in browser" from the menu at the top right.');
-    return;
-  }
+  const inApp = /TwitterAndroid|Twitter for|Instagram|FBAN|FBAV|Line\/|; wv\)/.test(navigator.userAgent);
   try {
     const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false });
     camError(); stopVideo(); resetSource();
@@ -1625,7 +1617,9 @@ $('#btnCam').addEventListener('click', async () => {
     msg(modelsReady ? '' : '顔認識モデルを読み込み中です…');
   } catch (err) {
     const n = err && err.name;
-    const [ja, en] = !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia
+    const [ja, en] = inApp ? ['アプリの中のブラウザではカメラが使えないことがあります。右上のメニューから「ブラウザで開く」を選んでください。', 'The camera may not work in in-app browsers. Choose "Open in browser" from the menu at the top right.']
+      : framed ? ['このページの中ではカメラが使えません。かおほんのページを直接開いてください。', 'The camera cannot be used inside this embedded page. Please open the kaohon page directly.']
+      : !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia
       ? ['このページの開き方ではカメラを使えません。Chrome か Safari で開き直してください。', 'The camera is not available here. Please open this page in Chrome or Safari.']
       : n === 'NotAllowedError' || n === 'SecurityError' ? ['カメラが許可されていません。アドレスバーのアイコンからカメラを「許可」にして、もう一度押してください。', 'Camera access is blocked. Allow the camera from the icon in the address bar, then press the button again.']
       : n === 'NotFoundError' || n === 'OverconstrainedError' ? ['カメラが見つかりません。接続を確認してください。', 'No camera was found. Please check that one is connected.']
