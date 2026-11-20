@@ -821,7 +821,14 @@ function hairMaskFor(f) {
   const mask = mk(w, h);
   const P = (lx, ly) => [(lx - x0) * ts2, (ly - y0) * ts2];
   if (f.demoHair && demoHairC) { toFrame(mask, demoHairC); }
-  else if (mpHairC) { toFrame(mask, mpHairC); }
+  else if (mpHairC && (() => {
+    // MediaPipe's hair model is trained on photos; on drawn faces (anime, CG) it often misses the hair.
+    // Trust it only when it covers most of the band just above the hairline, otherwise fall back to colour.
+    const mx = toFrame(mask, mpHairC), md = mx.getImageData(0, 0, w, h).data; let s = 0, n = 0;
+    for (let ly = f.minY - 0.2 * H; ly < f.minY + 0.02 * H; ly += 3 / ts2) for (let lx = f.spineX - 0.3 * W; lx < f.spineX + 0.3 * W; lx += 3 / ts2) { const [x, y] = P(lx, ly), X = Math.round(x), Y = Math.round(y); if (X < 0 || Y < 0 || X >= w || Y >= h) continue; s += md[(Y * w + X) * 4 + 3] / 255; n++; }
+    if (n && s / n > 0.35) return true;
+    mx.clearRect(0, 0, w, h); return false;
+  })()) { /* MediaPipe mask already drawn */ }
   else {
     const d = ix.getImageData(0, 0, w, h).data;
     const fm = mk(w, h), fmx = fm.getContext('2d', { willReadFrequently: true }); fmx.fillStyle = '#000'; fmx.beginPath(); f.poly.forEach((q, i) => { const [x, y] = P(q.x, q.y); i ? fmx.lineTo(x, y) : fmx.moveTo(x, y); }); fmx.closePath(); fmx.fill();
@@ -1653,7 +1660,7 @@ if (document.fonts) {
 }
 requestAnimationFrame(frame);
 loadModels();
-window.__kao = { setOutline: v => { showOutline = !!v; }, toggle, get faces() { return faces; }, get books() { return books; }, useImage, dragOpen };
+window.__kao = { setOutline: v => { showOutline = !!v; }, toggle, get faces() { return faces; }, get books() { return books; }, get hairMask() { return mpHairC; }, hairFor: f => hairMaskFor(f), useImage, dragOpen };
 })();
 </script>
 
