@@ -83,6 +83,8 @@ kbd { font-family: var(--f-body); font-size: 11px; border: 1px solid currentColo
 .samples .lbl { font-size: 12px; letter-spacing: .12em; color: var(--paper-dim); flex: none; }
 .samples button { flex: none; padding: 4px 10px 4px 4px; gap: 8px; font-size: 13px; }
 .samples button img { width: 44px; height: 54px; object-fit: cover; border-radius: 4px; display: block; }
+.samples button .two { display: flex; flex-direction: column; line-height: 1.25; }
+.samples button .two small { font-size: 10px; color: var(--paper-dim); letter-spacing: .08em; }
 .samples button[aria-pressed="true"] { border-color: var(--ochre); box-shadow: inset 0 0 0 1px var(--ochre); }
 .write { display: flex; gap: 8px; flex: 1 1 320px; min-width: 0; max-width: 460px; }
 .write input { flex: 1; min-width: 0; font-family: var(--f-hand); font-size: 17px; color: var(--paper); background: transparent; border: none; border-bottom: 1px solid var(--line); padding: 6px 2px; }
@@ -1474,8 +1476,8 @@ const SAMPLES = [
   { id: 'face-09', label: '斜め' },
   { id: 'face-10', label: 'スカーフ' },
   { id: 'face-11', label: '眼鏡' },
-  { id: 'face-13', label: 'アニメ・女子（試験的）' },
-  { id: 'face-14', label: 'アニメ・青年（試験的）' },
+  { id: 'face-13', label: 'アニメ女子', note: '試験的' },
+  { id: 'face-14', label: 'アニメ青年', note: '試験的' },
   { id: 'face-16', label: '3D・女の子' },
   { id: 'face-17', label: '3D・女性' }
 ];
@@ -1490,6 +1492,7 @@ function buildSamples() {
     if (s.id === 'demo') { const c = mk(88, 108); c.getContext('2d').drawImage(src, 180, 220, 440, 540, 0, 0, 88, 108); img.src = c.toDataURL('image/jpeg', 0.85); }
     else { img.src = sampleUrl(s.id); img.onerror = () => b.remove(); }
     const t = document.createElement('span'); t.textContent = s.label;
+    if (s.note) { t.className = 'two'; const n = document.createElement('small'); n.textContent = s.note; t.append(n); }
     b.append(img, t);
     b.addEventListener('click', () => {
       markSample(s.id);
