@@ -215,7 +215,7 @@ kbd { font-family: var(--f-body); font-size: 11px; border: 1px solid currentColo
   <div class="samples" id="samples" role="group" aria-label="見本の顔"><span class="lbl">見本</span></div>
   <p id="msg"></p>
   <div class="tip">気に入ったら、作者にコーヒー1杯分の応援をいただけるとうれしいです → <a href="https://ko-fi.com/hiloyu0" target="_blank" rel="noopener">Ko-fi で応援する</a></div>
-  <p class="build">ver. <span id="buildStamp">2026-11-21 07:24</span> JST</p>
+  <p class="build">ver. <span id="buildStamp">2026-11-21 07:26</span> JST</p>
   <details class="notes" open>
     <summary>このアプリについて</summary>
     <ul>
@@ -1695,7 +1695,9 @@ function moodFromBlend(cats) {
   return 'neutral';
 }
 function detectMediaPipe() {
-  const res = mp.lm.detect(src), W = src.width, H = src.height;
+  // some in-app browsers (e.g. X on older iPads) cannot hand a canvas to MediaPipe; pixels always work
+  let res; const W = src.width, H = src.height;
+  try { res = mp.lm.detect(src); } catch (e) { res = mp.lm.detect(srcx.getImageData(0, 0, W, H)); }
   return (res.faceLandmarks || []).map((lmk, i) => {
     const P = j => ({ x: lmk[j].x * W, y: lmk[j].y * H });
     const pts68 = MP68.map(P), oval = MP_OVAL.map(P);
@@ -1719,12 +1721,15 @@ function segmentHair() {
   } catch (e) { mpHairC = null; }
 }
 const MODEL_BASES = ['model', 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.13/model'];
-let mpErr = '';
+let mpErr = '', detFails = 0;
 async function loadModels() {
   pill('モデル読み込み中', 'busy');
   try { await loadMediaPipe(); modelsReady = true; pill(mode === 'demo' ? '見本の顔' : '準備完了', 'ok'); if (pendingImage) { pendingImage = false; detectNow(512); } return; }
   catch (e) { mp = null; mpErr = (e && (e.message || e.name)) || String(e); console.warn('MediaPipe failed', e); /* fall back to face-api */ }
-  if (!window.faceapi) { pill('顔認識なし', ''); msg('顔認識ライブラリを読み込めませんでした。見本の顔だけ使えます。'); return; }
+  await loadFaceApi();
+}
+async function loadFaceApi() {
+  if (!window.faceapi) { pill('顔認識なし', ''); msg(`顔認識ライブラリを読み込めませんでした。見本の顔だけ使えます。（理由: ${mpErr || '不明'}）`); return; }
   pill('モデル読み込み中', 'busy');
   for (const base of MODEL_BASES) {
     try {
@@ -1755,11 +1760,17 @@ async function detectNow(size) {
         .map(r => ({ frame: frameFromLandmarks(r.landmarks.positions), score: r.detection.score, expr: topExpr(r.expressions) }));
     }
     if (gen !== srcGen) { detecting = false; const s2 = detectAgain || size; detectAgain = 0; return detectNow(s2); }
+    detFails = 0;
     if (!frozen) faces = found;
     const n = faces.length;
     pill(n ? `顔を ${n} つ検知` : '顔を探しています', n ? 'ok' : 'busy');
     if (mode === 'image') msg(n ? '' : '顔が見つかりませんでした。正面を向いた、顔が大きめの写真で試してください。');
-  } catch (e) { /* skip a failed frame */ }
+  } catch (e) {
+    console.warn('detect failed', e);
+    detFails++;
+    if (mp && detFails >= 2) { mpErr = 'detect: ' + ((e && (e.message || e.name)) || e); mp = null; modelsReady = false; detecting = false; loadFaceApi().then(() => detectNow(size)); return; }
+    if (!mp || mode === 'image') { pill('顔認識エラー', ''); msg(`顔認識でエラーが起きました（${(e && (e.message || e.name)) || e}）。`); }
+  }
   detecting = false;
   if (detectAgain && mode === 'image') { const s2 = detectAgain; detectAgain = 0; detectNow(s2); } else detectAgain = 0;
 }
