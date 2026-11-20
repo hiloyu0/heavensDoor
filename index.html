@@ -1612,7 +1612,7 @@ function camError(ja, en, action) {
   e.textContent = ja; const s = document.createElement('span'); s.className = 'en'; s.lang = 'en'; s.textContent = en; e.append(s);
   if (action) {
     const row = document.createElement('div'); row.className = 'cam-acts';
-    const b = document.createElement('button'); b.type = 'button'; b.className = 'cam-act'; b.textContent = action.label; b.addEventListener('click', action.run); row.append(b);
+    if (action.run) { const b = document.createElement('button'); b.type = 'button'; b.className = 'cam-act'; b.textContent = action.label; b.addEventListener('click', action.run); row.append(b); }
     const c = document.createElement('button'); c.type = 'button'; c.className = 'cam-act sub'; c.textContent = 'URL をコピー / Copy link';
     c.addEventListener('click', async () => { const url = PUBLIC_URL; try { await navigator.clipboard.writeText(url); c.textContent = 'コピーしました / Copied'; } catch (_) { prompt('このURLをブラウザに貼り付けてください / Paste this URL into your browser', url); } });
     row.append(c); e.append(row);
@@ -1648,9 +1648,11 @@ $('#btnCam').addEventListener('click', async () => {
   } catch (err) {
     const n = err && err.name;
     if (inApp || framed) {
-      camError(inApp ? 'アプリの中のブラウザではカメラが使えないことがあります。下のボタンでブラウザで開き直すか、URL をコピーしてブラウザに貼り付けてください。' : 'このページの中ではカメラが使えません。下のボタンでかおほんのページを開いてください。',
-        inApp ? 'The camera may not work in in-app browsers. Reopen this page in your browser with the button below, or copy the link and paste it into your browser.' : 'The camera cannot be used inside this embedded page. Use the button below to open kaohon directly.',
-        { label: 'ブラウザで開く / Open in browser', run: openInBrowser });
+      // apps such as X, Instagram and Facebook do not let a page launch the real browser, so point at their own menu and offer the link
+      const isLine = /Line\//.test(navigator.userAgent);
+      if (framed) camError('このページの中ではカメラが使えません。下のボタンでかおほんのページを開いてください。', 'The camera cannot be used inside this embedded page. Use the button below to open kaohon directly.', { label: 'かおほんを開く / Open kaohon', run: openInBrowser });
+      else if (isLine) camError('LINE の中ではカメラが使えないことがあります。下のボタンでブラウザで開き直してください。', 'The camera may not work inside LINE. Use the button below to reopen this page in your browser.', { label: 'ブラウザで開く / Open in browser', run: openInBrowser });
+      else camError('アプリの中のブラウザではカメラが使えないことがあります。画面のメニュー（︙ など）から「ブラウザで開く」を選ぶか、URL をコピーして Chrome や Safari に貼り付けてください。', 'The camera may not work in in-app browsers. Choose "Open in browser" from the app\'s menu (⋮), or copy the link and paste it into Chrome or Safari.', { label: '', run: null });
       msg(''); return;
     }
     const [ja, en] = false ? ['', '']
@@ -1672,7 +1674,10 @@ const MP_OVAL = [10,338,297,332,284,251,389,356,454,323,361,288,397,365,379,378,
 async function loadMediaPipe() {
   const abs = p => new URL(p, location.href).href;
   const vis = await import(abs('mp/vision_bundle.mjs'));
-  const fileset = { wasmLoaderPath: abs('mp/vision_wasm_internal.js'), wasmBinaryPath: abs('mp/vision_wasm_internal.wasm') };
+  // older iPads / iOS before 16.4 have no WebAssembly SIMD: use MediaPipe's non-SIMD build there
+  let simd = true; try { simd = await vis.FilesetResolver.isSimdSupported(); } catch (_) { simd = true; }
+  const w = simd ? 'vision_wasm_internal' : 'vision_wasm_nosimd_internal';
+  const fileset = { wasmLoaderPath: abs(`mp/${w}.js`), wasmBinaryPath: abs(`mp/${w}.wasm`) };
   const buf = async p => { const r = await fetch(abs(p)); if (!r.ok) throw new Error(p); return new Uint8Array(await r.arrayBuffer()); };
   const lm = await vis.FaceLandmarker.createFromOptions(fileset, { baseOptions: { modelAssetBuffer: await buf('mp/face_landmarker.wasm'), delegate: 'CPU' }, runningMode: 'IMAGE', numFaces: 4, outputFaceBlendshapes: true });
   let seg = null;
@@ -1712,10 +1717,11 @@ function segmentHair() {
   } catch (e) { mpHairC = null; }
 }
 const MODEL_BASES = ['model', 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.13/model'];
+let mpErr = '';
 async function loadModels() {
   pill('モデル読み込み中', 'busy');
   try { await loadMediaPipe(); modelsReady = true; pill(mode === 'demo' ? '見本の顔' : '準備完了', 'ok'); if (pendingImage) { pendingImage = false; detectNow(512); } return; }
-  catch (e) { mp = null; /* fall back to face-api */ }
+  catch (e) { mp = null; mpErr = (e && (e.message || e.name)) || String(e); console.warn('MediaPipe failed', e); /* fall back to face-api */ }
   if (!window.faceapi) { pill('顔認識なし', ''); msg('顔認識ライブラリを読み込めませんでした。見本の顔だけ使えます。'); return; }
   pill('モデル読み込み中', 'busy');
   for (const base of MODEL_BASES) {
@@ -1726,8 +1732,9 @@ async function loadModels() {
       modelsReady = true; break;
     } catch (e) { /* try the next location */ }
   }
-  if (!modelsReady) { pill('顔認識なし', ''); msg('顔認識モデルを読み込めませんでした。見本の顔だけ使えます。'); return; }
-  pill(mode === 'demo' ? '見本の顔' : '準備完了', 'ok');
+  if (!modelsReady) { pill('顔認識なし', ''); msg(`顔認識モデルを読み込めませんでした。見本の顔だけ使えます。（理由: ${mpErr || '不明'}）`); return; }
+  pill(mode === 'demo' ? '見本の顔' : '準備完了（予備）', 'ok');
+  if (mpErr) console.warn('using face-api fallback:', mpErr);
   if (pendingImage) { pendingImage = false; detectNow(512); }
 }
 function topExpr(ex) { let best = 'neutral', v = 0; for (const k in ex) if (typeof ex[k] === 'number' && ex[k] > v) { v = ex[k]; best = k; } return best; }

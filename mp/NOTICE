@@ -7,3 +7,5 @@ Copyright Google LLC, licensed under the Apache License, Version 2.0 (see LICENS
 - hair_segmenter.wasm: the MediaPipe Hair Segmenter model (hair_segmenter.tflite), renamed
 
 The files were renamed only so that the hosting service serves them; their contents are unchanged.
+- vision_wasm_nosimd_internal.js, vision_wasm_nosimd_internal.wasm: the non-SIMD build from the same
+  npm package, used on browsers without WebAssembly SIMD
