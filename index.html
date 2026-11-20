@@ -1133,7 +1133,7 @@ function drawFx(t, dt) {
       const e = t - fxState.t0, hit = 0.42;
       if (e > hit && e < hit + 0.12) { fxx.fillStyle = `rgba(255,250,236,${0.35 * (1 - (e - hit) / 0.12)})`; fxx.fillRect(0, 0, dispW, dispH); }
       if (e > hit) { const d = e - hit; shakeY = 6 * Math.exp(-d * 9) * Math.sin(d * 60); }
-      if (e > 1.2) fxState = null;
+      if (e > 0.9) fxState = null;
     }
   }
   stage.style.transform = Math.abs(shakeX) + Math.abs(shakeY) > 0.2 ? `translate(${shakeX.toFixed(1)}px,${shakeY.toFixed(1)}px)` : '';
@@ -1237,7 +1237,7 @@ function sfx(text, b, kind) {
   const ang = kind === 'close' ? 6 : -10, rad = ang * Math.PI / 180;
   const bw = Math.abs(w * Math.cos(rad)) + Math.abs(h * Math.sin(rad)), bh = Math.abs(w * Math.sin(rad)) + Math.abs(h * Math.cos(rad));
   x = clamp(x, 6 + (bw - w) / 2, dispW - w - 6 - (bw - w) / 2); y = clamp(y, 6 + (bh - h) / 2, dispH - h - 6 - (bh - h) / 2);
-  sfxState = { t0: now(), x, y, ang, start: kind === 'close' ? 0.36 : IMPACT_AT, n: text.length };
+  sfxState = { t0: now(), x, y, ang, start: kind === 'close' ? 0.36 : IMPACT_AT, hold: kind === 'close' ? 0.45 : 1.25, fade: kind === 'close' ? 0.22 : 0.35, n: text.length };
 }
 function drawSfx(t) {
   const el = $('#sfx'); if (!sfxState) { el.style.opacity = 0; return; }
@@ -1251,8 +1251,8 @@ function drawSfx(t) {
     const r = rng(twos * 31 + i);
     let op = 0, sc2 = 1;
     if (le > 0) { op = 1; sc2 = 1 + 1.4 * Math.exp(-le * 14) * Math.cos(le * 30); }
-    const out = e - (s.start + 1.25 + i * 0.03);
-    if (out > 0) { op = clamp(1 - out / 0.35, 0, 1); sc2 *= 1 + out * 0.4; }
+    const out = e - (s.start + s.hold + i * 0.03);
+    if (out > 0) { op = clamp(1 - out / s.fade, 0, 1); sc2 *= 1 + out * 0.4; }
     if (op > 0) alive = true;
     const jx = (r() - .5) * 3, jy = (r() - .5) * 3 + (i % 2 ? 1 : -1) * 4;
     spans[i].style.opacity = op; spans[i].dataset.sc = sc2; spans[i].dataset.op = op;
@@ -1643,7 +1643,7 @@ function frame() {
   }
   // the grade holds until every page has shut
   const gt = books.some(b => b.state !== 'closing') ? 1 : books.length ? 0.85 : 0;
-  grade += (gt - grade) * Math.min(1, dt * (gt > grade ? 5 : 4));
+  grade += (gt - grade) * Math.min(1, dt * (gt > grade ? 5 : 9));
   if (fxState && fxState.kind === 'open' && t - fxState.t0 < IMPACT_AT) grade = Math.min(grade, 0.25 * Math.max(0, t - fxState.t0 - HOLD) / (IMPACT_AT - HOLD));
   U.uGrade.value = grade; faceUniforms();
   $('#vig').style.opacity = (0.9 * grade).toFixed(3);
