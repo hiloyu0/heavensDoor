@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 </head>
 <body>
-<title>顔の書</title>
+<title>かおほん</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -81,7 +81,7 @@ kbd { font-family: var(--f-body); font-size: 11px; border: 1px solid currentColo
 
 <div class="app">
   <header>
-    <h1>顔の書<small>顔をみつけて、本のようにひらく</small></h1>
+    <h1>かおほん<small>顔をみつけて、本のようにひらく</small></h1>
     <span class="pill" id="pill" data-s="busy"><i></i><span id="pillText">準備中</span></span>
   </header>
 
@@ -1278,11 +1278,11 @@ function pickMime() {
   return c.find(m => window.MediaRecorder && MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(m)) || '';
 }
 async function saveVideo(blob, ext) {
-  const name = `kao-no-sho-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')}.${ext}`;
+  const name = `kaohon-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')}.${ext}`;
   const file = new File([blob], name, { type: blob.type });
   // phones: hand the clip straight to the share sheet (post to X, save to photos)
   if (navigator.canShare && navigator.canShare({ files: [file] })) {
-    try { await navigator.share({ files: [file], title: '顔の書' }); msg('動画を共有しました。'); return; } catch (e) { if (e && e.name === 'AbortError') { msg('共有をやめました。もう一度「動画で保存」で撮り直せます。'); return; } }
+    try { await navigator.share({ files: [file], title: 'かおほん' }); msg('動画を共有しました。'); return; } catch (e) { if (e && e.name === 'AbortError') { msg('共有をやめました。もう一度「動画で保存」で撮り直せます。'); return; } }
   }
   // inside the claude.ai viewer, page-started downloads go through the downloads capability
   let framed = false; try { framed = window.self !== window.top; } catch (_) { framed = true; }
