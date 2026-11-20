@@ -797,11 +797,11 @@ function updateBook(b, t, dt) {
       if (sx < mg * 2.5 || sx > dispW - mg * 2.5 || sy < mg * 2.5 || sy > dispH - mg * 2.5) roomy = false; } }
     if (out) b.fit = Math.max(0.25, b.fit - dt * 0.9); else if (roomy) b.fit = Math.min(1, b.fit + dt * 0.2);
   }
-  if (opening && el > 2.8) b.state = 'open';
+  if (opening && el > HOLD + 2.2) b.state = 'open';
   if (!opening && el > 0.4 && settled) b.state = 'closed';
   // vermilion handwriting, a dozen characters a second
   const total = inkTotal();
-  if (opening && el > 1.8 && b.inkShown < total) {
+  if (opening && el > HOLD + 1.2 && b.inkShown < total) {
     b.inkT += dt; const n = Math.min(total, Math.floor(b.inkT * 14));
     if (n !== b.inkShown) { b.inkShown = n; renderBase(b, n); }
   }
@@ -1027,7 +1027,10 @@ function emitFromTip(b, p) {
   const [x, y] = tipScreen(b, p), r = Math.random;
   for (let i = 0; i < 3; i++) { const a = (p.side > 0 ? 0 : Math.PI) + (r() - .5) * 1.4 + b.f.ang, sp = 120 + r() * 300; scrap(x, y + (r() - .5) * 60, Math.cos(a) * sp, Math.sin(a) * sp - 100, 0.05, false); }
 }
-const HOLD = 0.6, BUILD = 0.35, IMPACT_AT = HOLD + BUILD, IMPACT_LEN = 0.09;
+// HOLD: a still beat before the effect, used only when recording a video
+const BUILD = 0.35, IMPACT_LEN = 0.09, REC_HOLD = 0.6;
+let HOLD = 0, IMPACT_AT = BUILD;
+function setHold(h) { HOLD = h; IMPACT_AT = h + BUILD; }
 // check view: the outline the face sheet is cut to (yellow) and the detected landmarks (cyan)
 function drawOutlines() {
   const list = books.length ? books.map(b => b.f) : faces.map(fc => fc.frame);
@@ -1197,7 +1200,7 @@ function sndOpen() {
   noise(HOLD, IMPACT_AT - HOLD, 400, 4200, 0.18, 'bandpass', 2.5);          // rising tear
   thump(IMPACT_AT, 0.6); noise(IMPACT_AT, 0.16, 6000, 2500, 0.35, 'highpass', 0.5);
   [0.01, 0.15, 0.23, 0.3, 0.36, 0.41].forEach((d, i) => paperFlip(IMPACT_AT + d + Math.random() * 0.015, i === 0 ? 0.3 : 0.2 + Math.random() * 0.06));
-  [2.0, 2.08, 2.15].forEach(d => paperFlip(d + Math.random() * 0.03, 0.12));   // the pages settle
+  [1.4, 1.48, 1.55].forEach(d => paperFlip(HOLD + d + Math.random() * 0.03, 0.12));   // the pages settle
 }
 function sndClose() { for (let i = 0; i < 5; i++) paperFlip(i * 0.04 + Math.random() * 0.01, 0.16); noise(0.4, 0.16, 1200, 250, 0.45, 'lowpass', 0.7); thump(0.42, 0.35); }
 
@@ -1335,12 +1338,12 @@ async function recordEffect() {
   rec = mr; btn.disabled = true; btn.textContent = '録画中…'; msg('めくれるところを録画しています（約5秒）。');
   const done = new Promise(r => { mr.onstop = r; });
   // build the book first, then record from the moment the effect clock starts until it has settled
-  openAll();
-  if (!books.length) { rec = null; btn.disabled = false; btn.textContent = '動画で保存'; return; }
+  setHold(REC_HOLD); openAll();
+  if (!books.length) { setHold(0); rec = null; btn.disabled = false; btn.textContent = '動画で保存'; return; }
   mr.start(250);
   const t0 = fxState ? fxState.t0 : now(), wall = performance.now();
-  await new Promise(r => { const tick = () => (now() - t0 > 4.9 || performance.now() - wall > 20000) ? r() : requestAnimationFrame(tick); tick(); });
-  mr.stop(); await done; rec = null; recTrack = null;
+  await new Promise(r => { const tick = () => (now() - t0 > HOLD + 4.3 || performance.now() - wall > 20000) ? r() : requestAnimationFrame(tick); tick(); });
+  mr.stop(); await done; rec = null; recTrack = null; setHold(0);
   btn.disabled = false; btn.textContent = '動画で保存';
   const type = (mr.mimeType || mime || 'video/webm').split(';')[0], blob = new Blob(chunks, { type });
   await saveVideo(blob, type.includes('mp4') ? 'mp4' : 'webm');
