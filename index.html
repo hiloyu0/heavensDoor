@@ -1171,7 +1171,7 @@ function drawFx(t, dt) {
       lg.addColorStop(0, 'rgba(255,230,180,0)'); lg.addColorStop(clamp(ph - 0.15, 0, 1), 'rgba(255,230,180,0)'); lg.addColorStop(ph, `rgba(255,230,180,${0.35 + 0.3 * pul})`); lg.addColorStop(clamp(ph + 0.15, 0, 1), 'rgba(255,230,180,0)'); lg.addColorStop(1, 'rgba(255,230,180,0)');
       fxx.strokeStyle = lg; fxx.lineWidth = 2; fxx.shadowBlur = 8; fxx.beginPath(); fxx.moveTo(ax, ay); fxx.lineTo(bx2, by2); fxx.stroke();
       fxx.shadowBlur = 6; fxx.shadowColor = '#000'; fxx.font = `700 12px ${getComputedStyle(document.body).fontFamily}`; fxx.fillStyle = '#efe5cf';
-      fxx.fillText(fc.demo ? '見本の顔' : fc.mp ? '顔 (MediaPipe)' : `顔 ${Math.round(fc.score * 100)}%`, corners[0][0], corners[0][1] - 9);
+      fxx.fillText(fc.demo ? '見本の顔' : fc.mp ? '顔' : `顔 ${Math.round(fc.score * 100)}%`, corners[0][0], corners[0][1] - 9);
       fxx.restore();
     }
   }
@@ -1685,7 +1685,7 @@ function segmentHair() {
 const MODEL_BASES = ['model', 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.13/model'];
 async function loadModels() {
   pill('モデル読み込み中', 'busy');
-  try { await loadMediaPipe(); modelsReady = true; pill(mode === 'demo' ? '見本の顔' : '準備完了 (MediaPipe)', 'ok'); if (pendingImage) { pendingImage = false; detectNow(512); } return; }
+  try { await loadMediaPipe(); modelsReady = true; pill(mode === 'demo' ? '見本の顔' : '準備完了', 'ok'); if (pendingImage) { pendingImage = false; detectNow(512); } return; }
   catch (e) { mp = null; /* fall back to face-api */ }
   if (!window.faceapi) { pill('顔認識なし', ''); msg('顔認識ライブラリを読み込めませんでした。見本の顔だけ使えます。'); return; }
   pill('モデル読み込み中', 'busy');
