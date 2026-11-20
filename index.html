@@ -84,6 +84,7 @@ button:focus-visible, .btn:focus-within, input:focus-visible { outline: 2px soli
 #btnOpen:focus-visible { outline: 2px solid #a5f6ff; outline-offset: 4px; }
 #btnOpen:active { --glow: #080808; --inner-glow: #1c1c1c; --cyan: #444; --edge: #111; --ray: #050505; --light-ray: #fff; --letter: #090909; --outline: #fff; transform: translateY(3px); box-shadow: inset 0 0 0 1px #ffffff60, 0 1px 0 #08070d; }
 #btnOpen:active .eye { filter: grayscale(1); }
+#btnOpen:disabled { cursor: not-allowed; filter: grayscale(.85) brightness(.55); box-shadow: inset 0 0 0 1px #ffffff20; transform: none; }
 kbd { font-family: var(--f-body); font-size: 11px; border: 1px solid currentColor; border-radius: 3px; padding: 0 4px; opacity: .7; }
 @media (hover: none) { kbd { display: none; } }
 .btn input { position: absolute; width: 1px; height: 1px; opacity: 0; }
@@ -215,7 +216,7 @@ kbd { font-family: var(--f-body); font-size: 11px; border: 1px solid currentColo
   <div class="samples" id="samples" role="group" aria-label="見本の顔"><span class="lbl">見本</span></div>
   <p id="msg"></p>
   <div class="tip">気に入ったら、作者にコーヒー1杯分の応援をいただけるとうれしいです → <a href="https://ko-fi.com/hiloyu0" target="_blank" rel="noopener">Ko-fi で応援する</a></div>
-  <p class="build">ver. <span id="buildStamp">2026-11-21 07:32</span> JST</p>
+  <p class="build">ver. <span id="buildStamp">2026-11-21 07:38</span> JST</p>
   <details class="notes" open>
     <summary>このアプリについて</summary>
     <ul>
@@ -1514,7 +1515,8 @@ function closeAll() {
   if (books[0]) sfx('パタン', books[0], 'close');
   setOpenLabel(false);
 }
-function toggle() { isOpen() ? closeAll() : openAll(); }
+function toggle() { if (isOpen()) closeAll(); else if (faces.length) openAll(); }
+const btnOpen = $('#btnOpen');
 $('#btnOpen').addEventListener('click', toggle);
 window.addEventListener('keydown', e => { if (e.code === 'Space' && document.activeElement !== $('#ink') && !e.repeat) { e.preventDefault(); toggle(); } });
 
@@ -1806,6 +1808,7 @@ function frame() {
   U.uGrade.value = grade; faceUniforms();
   $('#vig').style.opacity = (0.9 * grade).toFixed(3);
   stage.classList.toggle('open', isOpen());
+  { const off = !isOpen() && !faces.length; if (btnOpen.disabled !== off) { btnOpen.disabled = off; btnOpen.title = off ? '顔が見つかると押せます' : 'Space キーでも開け閉めできます'; } }
   drawFx(t, dt);
   if (showOutline) drawOutlines();
   drawSfx(t);
